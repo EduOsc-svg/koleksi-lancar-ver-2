@@ -1,0 +1,829 @@
+import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMonthlyPerformance, useYearlyTarget } from "@/hooks/useMonthlyPerformance";
+import { useYearlyFinancialSummary } from "@/hooks/useYearlyFinancialSummary";
+import { useContracts } from '@/hooks/useContracts';
+import { useOperationalExpenses, useOperationalExpenseMutations, OperationalExpenseInput } from "@/hooks/useOperationalExpenses";
+import { useAgentContractHistory } from "@/hooks/useAgentPerformance";
+import { formatRupiah } from "@/lib/format";
+import { exportYearlyReportToExcel } from "@/lib/exportYearlyReport";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/TablePagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, startOfMonth, addMonths, subMonths } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChart";
+import { toast } from "sonner";
+
+export default function Dashboard() {
+  const { t, i18n } = useTranslation();
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedYear, setSelectedYear] = useState(new Date());
+  const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [newExpense, setNewExpense] = useState<OperationalExpenseInput>({
+    expense_date: format(new Date(), 'yyyy-MM-dd'),
+    description: '',
+    amount: 0,
+    category: '',
+    notes: '',
+  });
+  
+  const { data: monthlyData, isLoading: isLoadingMonthly } = useMonthlyPerformance(selectedMonth);
+  const { data: contracts } = useContracts();
+  const { data: yearlyData, isLoading: isLoadingYearly } = useYearlyTarget(selectedYear);
+  const { data: yearlyFinancial, isLoading: isLoadingYearlyFinancial } = useYearlyFinancialSummary(selectedYear);
+  const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
+  const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
+  const { createExpense, deleteExpense } = useOperationalExpenseMutations();
+  
+  // Pagination for sales agent performance table
+  const AGENTS_PER_PAGE = 10;
+  const agentsList = useMemo(() => monthlyData?.agents || [], [monthlyData?.agents]);
+  const { currentPage: agentPage, totalPages: agentTotalPages, paginatedItems: paginatedAgents, goToPage: goToAgentPage, totalItems: agentTotalItems } = usePagination(agentsList, AGENTS_PER_PAGE);
+
+  // Pagination for contract history
+  const HISTORY_ITEMS_PER_PAGE = 5;
+  const paginatedHistoryData = useMemo(() => historyData || [], [historyData]);
+  const { currentPage, totalPages, paginatedItems: paginatedHistory, goToPage, totalItems } = usePagination(paginatedHistoryData, HISTORY_ITEMS_PER_PAGE);
+
+  // Calculate totals with operational expenses
+  const totalExpenses = useMemo(() => {
+    return expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) ?? 0;
+  }, [expenses]);
+
+  // ===== CASH-BASIS TOTALS (konsisten dgn Profit & Komisi) =====
+  // Modal & Omset diakui PROPORSIONAL dari pembayaran yang masuk di bulan ini.
+  // Sumber: useMonthlyPerformance → realizeContract() per kontrak.
+  const contractTotals = useMemo(() => ({
+    total_modal: monthlyData?.total_modal ?? 0,
+    total_omset: monthlyData?.total_omset ?? 0,
+  }), [monthlyData?.total_modal, monthlyData?.total_omset]);
+
+  // Total uang yang benar-benar tertagih bulan ini (cash inflow apa adanya)
+  const totalCollected = useMemo(
+    () => monthlyData?.total_collected ?? 0,
+    [monthlyData?.total_collected]
+  );
+
+  // Yearly contract totals (contract-basis) for selected year
+  const yearlyContractTotals = useMemo(() => {
+    if (!contracts) return { total_modal: 0, total_omset: 0 };
+    const yearNum = selectedYear.getFullYear();
+    let total_modal = 0;
+    let total_omset = 0;
+    contracts.forEach((c) => {
+      if (!c.start_date) return;
+      const s = new Date(c.start_date);
+      if (s.getFullYear() === yearNum) {
+        total_modal += Number(c.omset || 0);
+        total_omset += Number(c.total_loan_amount || 0);
+      }
+    });
+    return { total_modal, total_omset };
+  }, [contracts, selectedYear]);
+
+  // Calculate total modal & omset based on contracts for the selected YEAR (accrual basis)
+  const contractTotalsYearly = useMemo(() => {
+    if (!contracts) return { total_modal: 0, total_omset: 0 };
+    const yearNum = selectedYear.getFullYear();
+    const filtered = contracts.filter(c => {
+      if (!c.start_date) return false;
+      const d = new Date(c.start_date);
+      return d.getFullYear() === yearNum;
+    });
+    const total_modal = filtered.reduce((s, c) => s + Number(c.omset || 0), 0);
+    const total_omset = filtered.reduce((s, c) => s + Number(c.total_loan_amount || 0), 0);
+    return { total_modal, total_omset };
+  }, [contracts, selectedYear]);
+
+  // Keuntungan Kotor berdasarkan cash-basis (realized): omset_realized - modal_realized
+  const realizedProfit = useMemo(() => monthlyData?.total_profit ?? 0, [monthlyData?.total_profit]);
+
+  // Keuntungan Bersih (net): realized profit dikurangi komisi dan biaya operasional
+  const netProfit = useMemo(() => {
+    const profit = monthlyData?.total_profit ?? 0;
+    const commission = monthlyData?.total_commission ?? 0;
+    return profit - commission - totalExpenses;
+  }, [monthlyData?.total_profit, monthlyData?.total_commission, totalExpenses]);
+
+  // Margin keuntungan kotor cash-basis: (omset_realized - modal_realized) / modal_realized * 100
+  // = "berapa % markup dari modal terealisasi yang sudah menghasilkan omset"
+  const grossProfitMargin = useMemo(() => {
+    const modal = monthlyData?.total_modal ?? 0;
+    const omset = monthlyData?.total_omset ?? 0;
+    if (modal <= 0) return 0;
+    return ((omset - modal) / modal) * 100;
+  }, [monthlyData?.total_modal, monthlyData?.total_omset]);
+
+  const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
+
+  // Month navigation
+  const handlePrevMonth = () => setSelectedMonth(prev => subMonths(prev, 1));
+  const handleNextMonth = () => setSelectedMonth(prev => addMonths(prev, 1));
+
+  // Year options
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  }, []);
+
+  // Handle add expense
+  const handleAddExpense = async () => {
+    if (!newExpense.description || newExpense.amount <= 0) return;
+    await createExpense.mutateAsync(newExpense);
+    setNewExpense({
+      expense_date: format(new Date(), 'yyyy-MM-dd'),
+      description: '',
+      amount: 0,
+      category: '',
+      notes: '',
+    });
+    setExpenseDialogOpen(false);
+  };
+
+  // Handle export to Excel
+  const handleExportYearlyReport = async () => {
+    if (!yearlyFinancial) {
+      toast.error('Data tahunan belum tersedia');
+      return;
+    }
+    try {
+      await exportYearlyReportToExcel(yearlyFinancial, selectedYear.getFullYear());
+      toast.success('Laporan tahunan berhasil diexport');
+    } catch (error) {
+      toast.error('Gagal mengexport laporan');
+      console.error(error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-bold">{t("dashboard.title")}</h2>
+        </div>
+        
+        {/* Month Selector */}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">
+              {format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}
+            </span>
+          </div>
+          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Monthly Summary Cards - Horizontal Scrollable */}
+      <ScrollArea className="w-full">
+        <div className="flex gap-4 pb-4" style={{ minWidth: 'max-content' }}>
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={DollarSign}
+              iconColor="text-blue-500"
+              label="Modal Tertagih"
+              value={contractTotals.total_modal}
+              subtitle="Realized bulan ini"
+              hoverInfo="Modal yang sudah terealisasi proporsional dari pembayaran masuk bulan ini (cash basis)."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={Wallet}
+              iconColor="text-indigo-500"
+              label="Omset Tertagih"
+              value={contractTotals.total_omset}
+              subtitle="Realized bulan ini"
+              hoverInfo="Omset (harga jual) yang diakui dari pembayaran masuk bulan ini, proporsional thd nilai kontrak."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={TrendingUp}
+              iconColor="text-green-500"
+              label="Keuntungan Kotor"
+              value={realizedProfit}
+              valueColor="text-green-600"
+              subtitle="Omset − Modal (realized)"
+              hoverInfo="Keuntungan kotor dari uang yang sudah tertagih, sebelum dikurangi komisi & operasional."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={CircleDollarSign}
+              iconColor="text-emerald-500"
+              label="Margin Kotor"
+              value={grossProfitMargin}
+              isPercentage
+              valueColor={grossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
+              subtitle="(Omset − Modal) / Modal"
+              hoverInfo="Persentase markup dari modal terealisasi. Mis: 25% berarti tiap Rp 100 modal hasilkan Rp 25 keuntungan kotor."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={Percent}
+              iconColor="text-purple-500"
+              label="Total Komisi"
+              value={monthlyData?.total_commission ?? 0}
+              valueColor="text-purple-600"
+              subtitle="Semua sales bulan ini"
+              hoverInfo="Total komisi seluruh sales agent, dihitung dari omset tertagih × tier komisi masing-masing."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
+              icon={Settings}
+              iconColor="text-orange-500"
+              label="Biaya Operasional"
+              value={totalExpenses}
+              valueColor="text-orange-600"
+              isNegative
+              subtitle="Pengeluaran bulan ini"
+              hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
+            />
+          </div>
+
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+
+      {/* Net Profit Card */}
+      <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Keuntungan Bersih</p>
+              <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                {formatRupiah(netProfit)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground mb-1">Periode</p>
+              <p className="font-medium">{format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Collection Trend Chart Component */}
+      <CollectionTrendChart />
+
+      {/* Operational Expenses Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-orange-500" />
+              <CardTitle>Biaya Operasional - {format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}</CardTitle>
+            </div>
+            <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Tambah
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Tambah Biaya Operasional</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Tanggal</label>
+                    <Input
+                      type="date"
+                      value={newExpense.expense_date}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Deskripsi</label>
+                    <Input
+                      placeholder="Contoh: Bensin, Pulsa, dll"
+                      value={newExpense.description}
+                      onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Kategori (Opsional)</label>
+                    <Input
+                      placeholder="Contoh: Transport, Komunikasi"
+                      value={newExpense.category || ''}
+                      onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Jumlah</label>
+                    <CurrencyInput
+                      placeholder="Rp 0"
+                      value={newExpense.amount || 0}
+                      onValueChange={(val) => setNewExpense({ ...newExpense, amount: val || 0 })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Catatan (Opsional)</label>
+                    <Textarea
+                      placeholder="Catatan tambahan..."
+                      value={newExpense.notes || ''}
+                      onChange={(e) => setNewExpense({ ...newExpense, notes: e.target.value })}
+                    />
+                  </div>
+                  <Button onClick={handleAddExpense} disabled={createExpense.isPending} className="w-full">
+                    {createExpense.isPending ? 'Menyimpan...' : 'Simpan'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingExpenses ? (
+            <Skeleton className="h-[150px] w-full" />
+          ) : expenses && expenses.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {/* Left: Expenses table (full width) */}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Deskripsi</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead className="text-right">Jumlah</TableHead>
+                      <TableHead>Catatan</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>
+                          {new Date(expense.expense_date).toLocaleDateString(locale, {
+                            day: 'numeric',
+                            month: 'short'
+                          })}
+                        </TableCell>
+                        <TableCell className="font-medium">{expense.description}</TableCell>
+                        <TableCell className="text-muted-foreground">{expense.category || '-'}</TableCell>
+                        <TableCell className="text-right text-orange-600 font-medium">
+                          {formatRupiah(expense.amount)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">
+                          {expense.notes || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteExpense.mutate(expense.id)}
+                            disabled={deleteExpense.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Keuntungan Akhir summary removed from operational container as requested */}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Belum ada biaya operasional bulan ini
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sales Agent Performance Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            <CardTitle>{t("dashboard.salesPerformance", "Performa Sales")} - {format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.clickToViewHistory", "Klik untuk melihat kontrak yang didapat")}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {isLoadingMonthly ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]">#</TableHead>
+                      <TableHead>{t("dashboard.agentCode", "Kode Sales")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.modal", "Modal")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.omset", "Omset")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.profit", "Keuntungan")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.profitMargin", "Margin %")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.commission", "Komisi")}</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedAgents.map((agent, index) => (
+                      <TableRow 
+                        key={agent.agent_id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedAgent({ id: agent.agent_id, name: agent.agent_name, code: agent.agent_code })}
+                      >
+                        <TableCell className="font-medium">{(agentPage - 1) * AGENTS_PER_PAGE + index + 1}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{agent.agent_code}</p>
+                            <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.commission_percentage}%</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
+                        <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
+                        <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
+                        <TableCell className="text-right text-emerald-600">{agent.profit_margin.toFixed(1)}%</TableCell>
+                        <TableCell className="text-right text-purple-600">{formatRupiah(agent.total_commission)}</TableCell>
+                        <TableCell>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {paginatedAgents.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          {t("dashboard.noAgentData", "Belum ada data sales agent bulan ini")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={agentPage}
+                totalPages={agentTotalPages}
+                onPageChange={goToAgentPage}
+                totalItems={agentTotalItems}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Yearly Financial Summary Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-indigo-500" />
+              <CardTitle>Kalkulasi Keuangan Tahunan</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedYear.getFullYear().toString()}
+                onValueChange={(val) => setSelectedYear(new Date(parseInt(val), 0, 1))}
+              >
+                <SelectTrigger className="w-[140px] bg-background">
+                  <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
+                  <SelectValue placeholder="Pilih Tahun" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-md">
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      <span className="font-medium">{year}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportYearlyReport}
+                disabled={isLoadingYearlyFinancial || !yearlyFinancial}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Excel
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isLoadingYearlyFinancial ? (
+            <Skeleton className="h-[400px] w-full" />
+          ) : (
+            <>
+              {/* Summary Cards - Using StatCard like monthly */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <StatCard
+                  icon={DollarSign}
+                  iconColor="text-blue-500"
+                  label="Total Modal"
+                  value={contractTotalsYearly.total_modal}
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_modal ?? 0)} | ${yearlyFinancial?.contracts_count ?? 0} kontrak • Lancar: ${yearlyFinancial?.lancar_count ?? 0} | K.Lancar: ${yearlyFinancial?.kurang_lancar_count ?? 0} | Macet: ${yearlyFinancial?.macet_count ?? 0} | Lunas: ${yearlyFinancial?.completed_count ?? 0}`}
+                />
+                
+                <StatCard
+                  icon={Wallet}
+                  iconColor="text-indigo-500"
+                  label="Total Omset"
+                  value={contractTotalsYearly.total_omset}
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_omset ?? 0)} | ${yearlyFinancial?.contracts_count ?? 0} kontrak • Lancar: ${yearlyFinancial?.lancar_count ?? 0} | K.Lancar: ${yearlyFinancial?.kurang_lancar_count ?? 0} | Macet: ${yearlyFinancial?.macet_count ?? 0} | Lunas: ${yearlyFinancial?.completed_count ?? 0}`}
+                />
+
+                <StatCard
+                  icon={TrendingUp}
+                  iconColor="text-green-500"
+                  label="Keuntungan Kotor"
+                  value={yearlyFinancial?.total_profit ?? 0}
+                  valueColor="text-green-600"
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_profit ?? 0)} | Margin: ${yearlyFinancial?.profit_margin?.toFixed(1) ?? 0}%`}
+                />
+
+                <StatCard
+                  icon={Percent}
+                  iconColor="text-purple-500"
+                  label="Total Komisi"
+                  value={yearlyFinancial?.total_commission ?? 0}
+                  valueColor="text-purple-600"
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_commission ?? 0)} | Dari ${yearlyFinancial?.contracts_count ?? 0} kontrak`}
+                />
+
+                <StatCard
+                  icon={Settings}
+                  iconColor="text-orange-500"
+                  label="Biaya Operasional"
+                  value={yearlyFinancial?.total_expenses ?? 0}
+                  valueColor="text-orange-600"
+                  isNegative
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_expenses ?? 0)} | Biaya operasional tahun ${selectedYear.getFullYear()}`}
+                />
+
+              </div>
+
+              {/* Monthly Breakdown Chart */}
+              <div>
+                <h4 className="text-sm font-medium mb-3">Breakdown Bulanan</h4>
+                <div className="h-[250px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={yearlyFinancial?.monthly_breakdown || []}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="monthLabel" className="text-xs" />
+                      <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} className="text-xs" />
+                      <Tooltip
+                        formatter={(value: number, name: string) => {
+                          const labels: Record<string, string> = {
+                            total_modal: 'Modal',
+                            total_omset: 'Omset',
+                            profit: 'Keuntungan',
+                            collected: 'Tertagih',
+                          };
+                          return [formatRupiah(value), labels[name] || name];
+                        }}
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--card))", 
+                          border: "1px solid hsl(var(--border))" 
+                        }}
+                      />
+                      <Bar dataKey="total_modal" fill="hsl(217, 91%, 60%)" name="total_modal" />
+                      <Bar dataKey="total_omset" fill="hsl(239, 84%, 67%)" name="total_omset" />
+                      <Bar dataKey="profit" fill="hsl(142, 76%, 36%)" name="profit" />
+                      <Bar dataKey="collected" fill="hsl(168, 84%, 38%)" name="collected" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Collection Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Jumlah Kontrak</p>
+                  <p className="text-xl font-bold">{yearlyFinancial?.contracts_count ?? 0}</p>
+                </div>
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Sudah Tertagih</p>
+                  <p className="text-xl font-bold text-green-600">{formatRupiah(yearlyFinancial?.total_collected ?? 0)}</p>
+                </div>
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Sisa Tagihan</p>
+                  <p className="text-xl font-bold text-orange-600">{formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}</p>
+                </div>
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Tingkat Penagihan</p>
+                  <p className="text-xl font-bold text-blue-600">{(yearlyFinancial?.collection_rate ?? 0).toFixed(1)}%</p>
+                </div>
+              </div>
+
+              {/* Agent Performance Table */}
+              {yearlyFinancial?.agents && yearlyFinancial.agents.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="h-5 w-5 text-primary" />
+                    <h4 className="text-sm font-medium">Performa Sales Tahunan</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Klik untuk melihat kontrak yang didapat
+                  </p>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Kode Sales</TableHead>
+                          <TableHead className="text-right">Modal</TableHead>
+                          <TableHead className="text-right">Omset</TableHead>
+                          <TableHead className="text-right">Keuntungan</TableHead>
+                          <TableHead className="text-right">Margin %</TableHead>
+                          <TableHead className="text-right">Komisi</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {yearlyFinancial.agents.map((agent, index) => {
+                          const profitMargin = agent.total_omset > 0 
+                            ? ((agent.profit / agent.total_omset) * 100) 
+                            : 0;
+                          return (
+                            <TableRow 
+                              key={agent.agent_id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => setSelectedAgent({ 
+                                id: agent.agent_id, 
+                                name: agent.agent_name, 
+                                code: agent.agent_code 
+                              })}
+                            >
+                              <TableCell className="font-medium">{index + 1}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{agent.agent_code}</p>
+                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
+                              <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
+                              <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{profitMargin.toFixed(1)}%</TableCell>
+                              <TableCell className="text-right text-purple-600">{formatRupiah(agent.total_commission)}</TableCell>
+                              <TableCell>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Agent Contract History Dialog */}
+      <Dialog open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
+        <DialogContent className="max-w-5xl w-[95vw]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setSelectedAgent(null)}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              {t("dashboard.contractHistory", "Kontrak Didapat")} - {selectedAgent?.code} ({selectedAgent?.name})
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {isLoadingHistory ? (
+              <Skeleton className="h-[200px] w-full" />
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("dashboard.startDate", "Tanggal Mulai")}</TableHead>
+                      <TableHead>{t("dashboard.contract", "Kontrak")}</TableHead>
+                      <TableHead>{t("dashboard.product", "Produk")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.modal", "Modal")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.omset", "Omset")}</TableHead>
+                      <TableHead className="text-right">{t("dashboard.profit", "Keuntungan")}</TableHead>
+                      <TableHead className="text-center">{t("dashboard.status", "Status")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedHistory?.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          {new Date(item.start_date).toLocaleDateString(locale, {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-sm">{item.contract_ref}</p>
+                              {item.is_new_contract && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">Kontrak Baru</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-muted-foreground">{item.customer_name}</p>
+                              {item.is_new_customer && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">Pelanggan Baru</span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{item.product_type || '-'}</TableCell>
+                        <TableCell className="text-right text-blue-600">{formatRupiah(item.modal)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatRupiah(item.omset)}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">{formatRupiah(item.profit)}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            item.status === 'active' ? 'bg-green-100 text-green-700' : 
+                            item.status === 'completed' ? 'bg-blue-100 text-blue-700' : 
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!paginatedHistory || paginatedHistory.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          {t("dashboard.noData", "Tidak ada data kontrak")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+
+                {totalItems > HISTORY_ITEMS_PER_PAGE && (
+                  <div className="mt-4">
+                    <TablePagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={goToPage}
+                      totalItems={totalItems}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
