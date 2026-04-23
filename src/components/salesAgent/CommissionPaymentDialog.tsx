@@ -138,6 +138,7 @@ export function CommissionPaymentDialog({
                         <TableHead>Kode Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
                         <TableHead>Omset</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -146,6 +147,15 @@ export function CommissionPaymentDialog({
                           <TableCell className="font-medium">{item.contract_ref}</TableCell>
                           <TableCell>{item.customer_name}</TableCell>
                           <TableCell>{formatRupiah(item.omset)}</TableCell>
+                          <TableCell>
+                            {item.customer_status === 'lama' ? (
+                              <Badge variant="secondary">Lama</Badge>
+                            ) : (
+                              <Badge className="bg-green-600 hover:bg-green-600/90 text-white">
+                                Baru
+                              </Badge>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
