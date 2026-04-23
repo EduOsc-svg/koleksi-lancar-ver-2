@@ -50,6 +50,21 @@ export const useCommissionPayments = (salesAgentId: string | null) => {
   });
 };
 
+// Normalisasi no HP: hilangkan non-digit, samakan prefix 62 → 0
+const normalizePhone = (phone: string | null | undefined): string => {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('62')) return '0' + digits.slice(2);
+  if (digits.startsWith('0')) return digits;
+  return digits;
+};
+
+const normalizeName = (name: string | null | undefined): string => {
+  if (!name) return '';
+  return String(name).trim().toLowerCase().replace(/\s+/g, ' ');
+};
+
 // Fetch unpaid commissions (contracts without commission payment)
 export const useUnpaidCommissions = (salesAgentId: string | null) => {
   return useQuery({
@@ -65,11 +80,42 @@ export const useUnpaidCommissions = (salesAgentId: string | null) => {
           contract_ref,
           total_loan_amount,
           omset,
-          customers(name)
+          customer_id,
+          customers(name, phone)
         `)
         .eq('sales_agent_id', salesAgentId);
 
       if (contractsError) throw contractsError;
+
+      // Hitung jumlah kontrak GLOBAL per pelanggan (acuan: no HP, fallback: nama)
+      const customerIds = Array.from(
+        new Set((contracts || []).map((c: any) => c.customer_id).filter(Boolean))
+      );
+
+      const phoneByCustomerId = new Map<string, string>();
+      const nameByCustomerId = new Map<string, string>();
+      (contracts || []).forEach((c: any) => {
+        if (c.customer_id) {
+          phoneByCustomerId.set(c.customer_id, normalizePhone(c.customers?.phone));
+          nameByCustomerId.set(c.customer_id, normalizeName(c.customers?.name));
+        }
+      });
+
+      // Ambil SEMUA kontrak (lintas agen) untuk pelanggan2 ini
+      const contractCountByKey = new Map<string, number>();
+      if (customerIds.length > 0) {
+        const { data: allContracts } = await supabase
+          .from('credit_contracts')
+          .select('customer_id, customers(phone, name)')
+          .in('customer_id', customerIds);
+
+        (allContracts || []).forEach((row: any) => {
+          const phoneKey = normalizePhone(row.customers?.phone);
+          const nameKey = normalizeName(row.customers?.name);
+          const key = phoneKey ? `p:${phoneKey}` : nameKey ? `n:${nameKey}` : null;
+          if (key) contractCountByKey.set(key, (contractCountByKey.get(key) || 0) + 1);
+        });
+      }
 
       // Get all paid commissions for this agent
       const { data: paidCommissions, error: commissionsError } = await supabase
