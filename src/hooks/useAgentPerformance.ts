@@ -1,19 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateTieredCommission, CommissionTier } from './useCommissionTiers';
-import { realizeContract, sumPaymentsByContract } from '@/lib/cashBasisCalc';
+import { sumPaymentsByContract } from '@/lib/cashBasisCalc';
 
 export interface AgentPerformanceData {
   agent_id: string;
   agent_name: string;
   agent_code: string;
   commission_percentage: number;
-  total_omset: number;      // realized cash basis
-  total_modal: number;      // realized cash basis
+  total_omset: number;      // CONTRACT BASIS — full nilai kontrak
+  total_modal: number;      // CONTRACT BASIS — full nilai modal
   total_contracts: number;
   total_commission: number;
-  total_to_collect: number;
-  total_collected: number;
+  total_to_collect: number; // outstanding (kupon belum dibayar)
+  total_collected: number;  // uang masuk aktual
   profit: number;
   profit_margin: number;
 }
@@ -23,8 +23,8 @@ export interface AgentContractHistory {
   customer_name: string;
   customer_code: string | null;
   product_type: string | null;
-  modal: number;            // realized (proporsional pembayaran)
-  omset: number;            // realized (= total dibayar)
+  modal: number;            // FULL (contract basis)
+  omset: number;            // FULL (contract basis)
   profit: number;
   tenor_days: number;
   start_date: string;
@@ -34,9 +34,15 @@ export interface AgentContractHistory {
   is_new_contract?: boolean;
 }
 
+/**
+ * Performa agen LIFETIME — CONTRACT BASIS.
+ * Omset/Modal/Profit diakui penuh saat kontrak dibuat (tidak menunggu pembayaran).
+ * Komisi dihitung dari total nilai kontrak penuh × tier yang berlaku.
+ * total_collected & total_to_collect tetap dari realisasi pembayaran/kupon.
+ */
 export const useAgentPerformance = () => {
   return useQuery({
-    queryKey: ['agent_performance_cash'],
+    queryKey: ['agent_performance_contract'],
     queryFn: async () => {
       const [
         { data: agents, error: agentsError },
@@ -71,24 +77,18 @@ export const useAgentPerformance = () => {
         contract_ids: Set<string>;
       }>();
 
+      // Akumulasi per agen — full contract value
       (contracts || []).forEach((c: any) => {
         const agentId = c.sales_agent_id;
         if (!agentId) return;
-        const totalPaid = paidByContract.get(c.id) || 0;
-        const realized = realizeContract({
-          contract_id: c.id,
-          modal_full: Number(c.omset || 0),
-          omset_full: Number(c.total_loan_amount || 0),
-          total_paid: totalPaid,
-        });
         const existing = agentMap.get(agentId) || {
           total_omset: 0, total_modal: 0, total_collected: 0, total_to_collect: 0,
           contract_ids: new Set<string>(),
         };
-        existing.total_omset += realized.omset_realized;
-        existing.total_modal += realized.modal_realized;
-        existing.total_collected += totalPaid;
-        if (totalPaid > 0) existing.contract_ids.add(c.id);
+        existing.total_omset += Number(c.total_loan_amount || 0);
+        existing.total_modal += Number(c.omset || 0);
+        existing.total_collected += paidByContract.get(c.id) || 0;
+        existing.contract_ids.add(c.id);
         agentMap.set(agentId, existing);
       });
 
@@ -131,33 +131,20 @@ export const useAgentPerformance = () => {
 
 export const useAgentContractHistory = (agentId: string | null) => {
   return useQuery({
-    queryKey: ['agent_contract_history_cash', agentId],
+    queryKey: ['agent_contract_history_contract', agentId],
     queryFn: async () => {
       if (!agentId) return [];
 
-      const [
-        { data: contracts, error },
-        { data: payments },
-      ] = await Promise.all([
-        supabase
-          .from('credit_contracts')
-          .select(`id, contract_ref, product_type, omset, total_loan_amount, tenor_days, start_date, status, sales_agent_id, customers(name, created_at)`)
-          .eq('sales_agent_id', agentId)
-          .order('start_date', { ascending: false }),
-        supabase.from('payment_logs').select('amount_paid, contract_id'),
-      ]);
+      const { data: contracts, error } = await supabase
+        .from('credit_contracts')
+        .select(`id, contract_ref, product_type, omset, total_loan_amount, tenor_days, start_date, status, sales_agent_id, customers(name, created_at)`)
+        .eq('sales_agent_id', agentId)
+        .order('start_date', { ascending: false });
       if (error) throw error;
 
-      const paidByContract = sumPaymentsByContract(payments || []);
-
       return (contracts || []).map((contract: any) => {
-        const totalPaid = paidByContract.get(contract.id) || 0;
-        const realized = realizeContract({
-          contract_id: contract.id,
-          modal_full: Number(contract.omset || 0),
-          omset_full: Number(contract.total_loan_amount || 0),
-          total_paid: totalPaid,
-        });
+        const modalFull = Number(contract.omset || 0);
+        const omsetFull = Number(contract.total_loan_amount || 0);
         const customerCreatedAt = contract.customers?.created_at || null;
         const startDate = contract.start_date ? new Date(contract.start_date) : null;
         const now = new Date();
@@ -170,9 +157,9 @@ export const useAgentContractHistory = (agentId: string | null) => {
           customer_name: contract.customers?.name || '-',
           customer_code: null,
           product_type: contract.product_type,
-          modal: realized.modal_realized,
-          omset: realized.omset_realized,
-          profit: realized.profit_realized,
+          modal: modalFull,
+          omset: omsetFull,
+          profit: omsetFull - modalFull,
           customer_created_at: customerCreatedAt,
           is_new_customer: isNewCustomer,
           is_new_contract: isNewContract,

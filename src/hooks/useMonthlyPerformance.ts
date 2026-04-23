@@ -2,19 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateTieredCommission, CommissionTier } from './useCommissionTiers';
 import { startOfMonth, endOfMonth, format, startOfYear, endOfYear } from 'date-fns';
-import { realizeContract, sumPaymentsByContract } from '@/lib/cashBasisCalc';
 
 export interface MonthlyPerformanceData {
   agent_id: string;
   agent_name: string;
   agent_code: string;
   commission_percentage: number;
-  total_omset: number;       // realized (cash basis)
-  total_modal: number;       // realized (cash basis)
+  total_omset: number;       // CONTRACT BASIS — full nilai kontrak yg dibuat di bulan ini
+  total_modal: number;       // CONTRACT BASIS — full nilai modal kontrak yg dibuat di bulan ini
   total_contracts: number;
   total_commission: number;
   total_to_collect: number;
-  total_collected: number;
+  total_collected: number;   // uang masuk aktual bulan ini (cash)
   profit: number;
   profit_margin: number;
 }
@@ -36,17 +35,17 @@ export interface YearlyTargetData {
 }
 
 /**
- * Performa bulanan — CASH BASIS.
- * Modal/Omset/Profit dihitung proporsional dari pembayaran yang masuk DI BULAN INI,
- * untuk semua kontrak (tidak terbatas tanggal kontrak).
- * Komisi: tier diterapkan ke total omset realized per agen.
+ * Performa bulanan — CONTRACT BASIS.
+ * Omset/Modal/Profit diakui PENUH untuk setiap kontrak yang start_date nya di bulan ini.
+ * total_collected = uang masuk AKTUAL di bulan ini (cash) — info pelengkap.
+ * Komisi: tier diterapkan ke total omset (full kontrak) per agen di bulan ini.
  */
 export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['monthly_performance_cash', monthStart, monthEnd],
+    queryKey: ['monthly_performance_contract', monthStart, monthEnd],
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
       const [
         { data: agents, error: agentsError },
@@ -55,7 +54,11 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
-        supabase.from('credit_contracts').select('id, omset, total_loan_amount, sales_agent_id'),
+        supabase
+          .from('credit_contracts')
+          .select('id, omset, total_loan_amount, sales_agent_id, start_date')
+          .gte('start_date', monthStart)
+          .lte('start_date', monthEnd),
         supabase
           .from('payment_logs')
           .select('amount_paid, payment_date, contract_id')
@@ -71,59 +74,55 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
 
-      // Sum pembayaran per kontrak (untuk bulan ini saja)
-      const paidByContract = sumPaymentsByContract(paymentsThisMonth || []);
-
-      // Map kontrak -> agent
-      const contractAgentMap = new Map<string, string>();
-      const contractFinanceMap = new Map<string, { modal_full: number; omset_full: number }>();
-      (contracts || []).forEach((c: any) => {
-        if (c.sales_agent_id) contractAgentMap.set(c.id, c.sales_agent_id);
-        contractFinanceMap.set(c.id, {
-          modal_full: Number(c.omset || 0),
-          omset_full: Number(c.total_loan_amount || 0),
-        });
-      });
-
-      // Aggregate realized per agen + jumlah kontrak yang ada pembayaran bulan ini
+      // Aggregate per agen — full contract values dari kontrak yg dibuat bulan ini
       const agentDataMap = new Map<string, {
         total_omset: number;
         total_modal: number;
-        total_collected: number;
         contract_ids: Set<string>;
       }>();
 
-      paidByContract.forEach((paidThisMonth, contractId) => {
-        const agentId = contractAgentMap.get(contractId);
+      (contracts || []).forEach((c: any) => {
+        const agentId = c.sales_agent_id;
         if (!agentId) return;
-        const fin = contractFinanceMap.get(contractId);
-        if (!fin) return;
-
-        const realized = realizeContract({
-          contract_id: contractId,
-          modal_full: fin.modal_full,
-          omset_full: fin.omset_full,
-          total_paid: paidThisMonth,
-        });
-
         const existing = agentDataMap.get(agentId) || {
           total_omset: 0,
           total_modal: 0,
-          total_collected: 0,
           contract_ids: new Set<string>(),
         };
-        existing.total_omset += realized.omset_realized;
-        existing.total_modal += realized.modal_realized;
-        existing.total_collected += paidThisMonth;
-        existing.contract_ids.add(contractId);
+        existing.total_omset += Number(c.total_loan_amount || 0);
+        existing.total_modal += Number(c.omset || 0);
+        existing.contract_ids.add(c.id);
         agentDataMap.set(agentId, existing);
+      });
+
+      // Sum uang masuk aktual per agen bulan ini (info pelengkap, dari kontrak manapun)
+      const contractAgentMapAll = new Map<string, string>();
+      // Perlu lookup agent dari kontrak yg pembayarannya masuk bulan ini, walau kontraknya dibuat bulan lain.
+      // Ambil agent_id dari payment_logs join contract via id (kontrak sudah di-fetch terbatas bulan ini saja),
+      // jadi untuk yang tidak ada di list, fetch tambahan agent mapping.
+      const paidContractIds = Array.from(new Set((paymentsThisMonth || []).map((p: any) => p.contract_id)));
+      if (paidContractIds.length > 0) {
+        const { data: contractAgents } = await supabase
+          .from('credit_contracts')
+          .select('id, sales_agent_id')
+          .in('id', paidContractIds);
+        (contractAgents || []).forEach((c: any) => {
+          if (c.sales_agent_id) contractAgentMapAll.set(c.id, c.sales_agent_id);
+        });
+      }
+
+      const collectedByAgent = new Map<string, number>();
+      (paymentsThisMonth || []).forEach((p: any) => {
+        const agentId = contractAgentMapAll.get(p.contract_id);
+        if (!agentId) return;
+        collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + Number(p.amount_paid || 0));
       });
 
       const agentResults: MonthlyPerformanceData[] = (agents || []).map((agent) => {
         const data = agentDataMap.get(agent.id);
         const total_omset = data?.total_omset || 0;
         const total_modal = data?.total_modal || 0;
-        const total_collected = data?.total_collected || 0;
+        const total_collected = collectedByAgent.get(agent.id) || 0;
         const total_contracts = data?.contract_ids.size || 0;
 
         const commissionPct = total_omset > 0 ? calculateTieredCommission(total_omset, tiers) : 0;

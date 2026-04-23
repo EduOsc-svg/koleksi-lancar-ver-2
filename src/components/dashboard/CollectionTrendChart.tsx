@@ -114,8 +114,9 @@ export function CollectionTrendChart() {
     setTimeout(updateScrollButtons, 300);
   }, [updateScrollButtons]);
 
-  // Collection trend totals
+  // Collection + contract trend totals
   const totalCollection = activeTrendData.reduce((sum, d) => sum + d.amount, 0);
+  const totalContract = activeTrendData.reduce((sum, d) => sum + (d.contractAmount || 0), 0);
   const avgPerPeriod = activeTrendData.length > 0 ? totalCollection / activeTrendData.length : 0;
 
   // Get current presets and value based on period
@@ -188,30 +189,36 @@ export function CollectionTrendChart() {
     );
   };
 
-  // Enhanced Custom Tooltip Component
+  // Enhanced Custom Tooltip Component (multi-series)
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const value = payload[0].value;
-      // Prefer the underlying ISO date if the data point provided it (hooks set a `date` field)
       const dateStr = payload[0]?.payload?.date || label;
       const date = new Date(dateStr);
       const formattedDate = trendPeriod === 'daily' && !isNaN(date.getTime())
         ? date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })
         : label;
-      
+
+      const seriesMeta: Record<string, { label: string; color: string }> = {
+        contractAmount: { label: 'Omset Kontrak Baru', color: '#6366f1' },
+        amount: { label: 'Penagihan Aktual', color: '#10b981' },
+      };
+
       return (
-        <div className="bg-slate-800/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl border border-slate-600/50">
-          <p className="text-slate-300 text-xs mb-2 font-medium">{formattedDate}</p>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-            <p className="text-white font-semibold text-sm">
-              {formatRupiah(value)}
-            </p>
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-600/30">
-            <p className="text-slate-400 text-xs">
-              {t("dashboard.collection", "Penagihan Harian")}
-            </p>
+        <div className="bg-slate-800/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl border border-slate-600/50 min-w-[220px]">
+          <p className="text-slate-300 text-xs mb-3 font-medium">{formattedDate}</p>
+          <div className="space-y-2">
+            {payload.map((entry: any) => {
+              const meta = seriesMeta[entry.dataKey] || { label: entry.dataKey, color: entry.color };
+              return (
+                <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: meta.color }} />
+                    <span className="text-slate-300 text-xs">{meta.label}</span>
+                  </div>
+                  <span className="text-white font-semibold text-sm">{formatRupiah(entry.value || 0)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -242,10 +249,15 @@ export function CollectionTrendChart() {
                   {t("dashboard.collectionTrend")}
                 </span>
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2 font-medium">
-                Total: <span className="text-blue-600 font-semibold">{formatRupiah(totalCollection)}</span> | 
-                {trendPeriod === 'daily' ? t("dashboard.avgDaily", "Rata-rata Harian") : trendPeriod === 'monthly' ? 'Rata-rata Bulanan' : 'Rata-rata Tahunan'}: 
-                <span className="text-emerald-600 font-semibold"> {formatRupiah(avgPerPeriod)}</span>
+              <p className="text-sm text-muted-foreground mt-2 font-medium flex flex-wrap gap-x-3 gap-y-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                  Omset Kontrak: <span className="text-indigo-600 font-semibold">{formatRupiah(totalContract)}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  Penagihan: <span className="text-emerald-600 font-semibold">{formatRupiah(totalCollection)}</span>
+                </span>
               </p>
             </div>
             <ToggleGroup 
@@ -324,13 +336,13 @@ export function CollectionTrendChart() {
                 >
                   {/* Gradient Definitions */}
                   <defs>
-                    <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity={1}/>
+                    <linearGradient id="contractGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#818cf8" stopOpacity={1}/>
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity={1}/>
                     </linearGradient>
-                    <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02}/>
+                    <linearGradient id="collectionGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#34d399" stopOpacity={1}/>
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={1}/>
                     </linearGradient>
                     <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
                       <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.1"/>
@@ -375,7 +387,7 @@ export function CollectionTrendChart() {
                     }}
                     width={50}
                     className="select-none"
-                    domain={['dataMin - dataMin * 0.1', 'dataMax + dataMax * 0.1']}
+                    domain={[0, 'dataMax + dataMax * 0.1']}
                   />
                   
                   {/* Custom Tooltip */}
@@ -390,17 +402,31 @@ export function CollectionTrendChart() {
                     animationDuration={200}
                   />
                   
-                  {/* Main Line - Enhanced styling with gradient */}
+                  {/* Line 1: Omset Kontrak Baru (accrual) */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="contractAmount" 
+                    stroke="url(#contractGradient)"
+                    strokeWidth={2.5}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    activeDot={{ r: 5, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
+                    connectNulls={false}
+                    animationDuration={1200}
+                    animationBegin={0}
+                  />
+
+                  {/* Line 2: Penagihan Aktual (cash) */}
                   <Line 
                     type="monotone" 
                     dataKey="amount" 
-                    stroke="url(#lineGradient)"
+                    stroke="url(#collectionGradient)"
                     strokeWidth={3}
                     dot={false}
                     activeDot={<CustomActiveDot />}
                     connectNulls={false}
                     animationDuration={1200}
-                    animationBegin={0}
+                    animationBegin={200}
                     filter="url(#dropShadow)"
                   />
                 </LineChart>
