@@ -528,6 +528,8 @@ export default function SalesAgents() {
               <TableHead>{t("salesAgents.phone")}</TableHead>
               <TableHead>{t("salesAgents.totalOmset", "Total Omset")}</TableHead>
               <TableHead>{t("salesAgents.earnings", "Komisi")}</TableHead>
+              <TableHead className="text-center" title="Pelanggan Baru (hanya 1 kontrak)">B</TableHead>
+              <TableHead className="text-center" title="Pelanggan Lama (≥2 kontrak)">L</TableHead>
               <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
