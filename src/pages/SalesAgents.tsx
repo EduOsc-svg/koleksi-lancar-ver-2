@@ -536,11 +536,11 @@ export default function SalesAgents() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">{t("common.loading")}</TableCell>
+                <TableCell colSpan={8} className="text-center">{t("common.loading")}</TableCell>
               </TableRow>
             ) : filteredAgents?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   {searchQuery ? `Tidak ada sales agent yang ditemukan dengan kata kunci "${searchQuery}"` : t("common.noData")}
                 </TableCell>
               </TableRow>
