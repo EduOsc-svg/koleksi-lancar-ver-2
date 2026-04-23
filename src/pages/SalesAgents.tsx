@@ -60,7 +60,7 @@ export default function SalesAgents() {
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
   const { data: agentOmsetData } = useAgentOmset();
-  // period can be 'monthly' | 'yearly' | 'lifetime'
+  const { data: agentCustomerCounts } = useAgentCustomerCounts();
   const periodParam = searchParams.get('period') || 'monthly';
   const monthParam = searchParams.get('month'); // optional yyyy-MM or yyyy-MM-dd
   const yearParam = searchParams.get('year');
