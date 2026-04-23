@@ -572,6 +572,16 @@ export default function SalesAgents() {
                     <TableCell className="font-medium text-primary">
                       {formatRupiah( (omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission )}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
+                        {agentCustomerCounts?.get(agent.id)?.baru ?? 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" title="Pelanggan Lama">
+                        {agentCustomerCounts?.get(agent.id)?.lama ?? 0}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button 
                         variant="ghost" 
