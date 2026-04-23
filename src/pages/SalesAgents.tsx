@@ -42,6 +42,8 @@ import {
   SalesAgent,
 } from "@/hooks/useSalesAgents";
 import { useAgentOmset } from "@/hooks/useAgentOmset";
+import { useAgentCustomerCounts } from "@/hooks/useAgentCustomerCounts";
+import { Badge } from "@/components/ui/badge";
 import { useMonthlyPerformance } from '@/hooks/useMonthlyPerformance';
 import { useYearlyFinancialSummary } from '@/hooks/useYearlyFinancialSummary';
 import { usePagination } from "@/hooks/usePagination";
@@ -58,7 +60,7 @@ export default function SalesAgents() {
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
   const { data: agentOmsetData } = useAgentOmset();
-  // period can be 'monthly' | 'yearly' | 'lifetime'
+  const { data: agentCustomerCounts } = useAgentCustomerCounts();
   const periodParam = searchParams.get('period') || 'monthly';
   const monthParam = searchParams.get('month'); // optional yyyy-MM or yyyy-MM-dd
   const yearParam = searchParams.get('year');
@@ -526,17 +528,19 @@ export default function SalesAgents() {
               <TableHead>{t("salesAgents.phone")}</TableHead>
               <TableHead>{t("salesAgents.totalOmset", "Total Omset")}</TableHead>
               <TableHead>{t("salesAgents.earnings", "Komisi")}</TableHead>
+              <TableHead className="text-center" title="Pelanggan Baru (hanya 1 kontrak)">B</TableHead>
+              <TableHead className="text-center" title="Pelanggan Lama (≥2 kontrak)">L</TableHead>
               <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">{t("common.loading")}</TableCell>
+                <TableCell colSpan={8} className="text-center">{t("common.loading")}</TableCell>
               </TableRow>
             ) : filteredAgents?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   {searchQuery ? `Tidak ada sales agent yang ditemukan dengan kata kunci "${searchQuery}"` : t("common.noData")}
                 </TableCell>
               </TableRow>
@@ -567,6 +571,16 @@ export default function SalesAgents() {
                     <TableCell className="font-medium">{formatRupiah((omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0)}</TableCell>
                     <TableCell className="font-medium text-primary">
                       {formatRupiah( (omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
+                        {agentCustomerCounts?.get(agent.id)?.baru ?? 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" title="Pelanggan Lama">
+                        {agentCustomerCounts?.get(agent.id)?.lama ?? 0}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button 
