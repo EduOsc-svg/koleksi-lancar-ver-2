@@ -42,6 +42,8 @@ import {
   SalesAgent,
 } from "@/hooks/useSalesAgents";
 import { useAgentOmset } from "@/hooks/useAgentOmset";
+import { useAgentCustomerCounts } from "@/hooks/useAgentCustomerCounts";
+import { Badge } from "@/components/ui/badge";
 import { useMonthlyPerformance } from '@/hooks/useMonthlyPerformance';
 import { useYearlyFinancialSummary } from '@/hooks/useYearlyFinancialSummary';
 import { usePagination } from "@/hooks/usePagination";
