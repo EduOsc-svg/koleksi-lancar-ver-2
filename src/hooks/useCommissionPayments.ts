@@ -157,17 +157,26 @@ export const useUnpaidCommissions = (salesAgentId: string | null) => {
         .filter(c => !paidContractIds.has(c.id))
         .map((contract: any) => {
           const contractAmount = Number(contract.total_loan_amount || 0);
-          
+
           // Calculate commission based on system type
-          const commissionPct = useTiered 
+          const commissionPct = useTiered
             ? calculateTieredCommission(contractAmount, tiers)
             : fixedPct;
           const commission = (contractAmount * commissionPct) / 100;
-          
+
+          // Status pelanggan: Lama jika no HP (fallback nama) muncul di ≥2 kontrak
+          const phoneKey = phoneByCustomerId.get(contract.customer_id) || '';
+          const nameKey = nameByCustomerId.get(contract.customer_id) || '';
+          const key = phoneKey ? `p:${phoneKey}` : nameKey ? `n:${nameKey}` : null;
+          const totalContractsForCustomer = key ? (contractCountByKey.get(key) || 1) : 1;
+          const customer_status: 'baru' | 'lama' = totalContractsForCustomer >= 2 ? 'lama' : 'baru';
+
           return {
             contract_id: contract.id,
             contract_ref: contract.contract_ref,
             customer_name: contract.customers?.name || '-',
+            customer_phone: contract.customers?.phone || null,
+            customer_status,
             omset: contractAmount,
             commission,
             commission_percentage: commissionPct,
