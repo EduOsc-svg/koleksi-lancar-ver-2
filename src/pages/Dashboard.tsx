@@ -81,15 +81,15 @@ export default function Dashboard() {
     return expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) ?? 0;
   }, [expenses]);
 
-  // ===== CASH-BASIS TOTALS (konsisten dgn Profit & Komisi) =====
-  // Modal & Omset diakui PROPORSIONAL dari pembayaran yang masuk di bulan ini.
-  // Sumber: useMonthlyPerformance → realizeContract() per kontrak.
+  // ===== CONTRACT-BASIS TOTALS (accrual) =====
+  // Modal & Omset diakui PENUH untuk kontrak yang dibuat di bulan ini.
+  // Sumber: useMonthlyPerformance → langsung dari nilai kontrak.
   const contractTotals = useMemo(() => ({
     total_modal: monthlyData?.total_modal ?? 0,
     total_omset: monthlyData?.total_omset ?? 0,
   }), [monthlyData?.total_modal, monthlyData?.total_omset]);
 
-  // Total uang yang benar-benar tertagih bulan ini (cash inflow apa adanya)
+  // Total uang yang benar-benar tertagih bulan ini (cash inflow apa adanya) — info pelengkap
   const totalCollected = useMemo(
     () => monthlyData?.total_collected ?? 0,
     [monthlyData?.total_collected]
@@ -126,18 +126,17 @@ export default function Dashboard() {
     return { total_modal, total_omset };
   }, [contracts, selectedYear]);
 
-  // Keuntungan Kotor berdasarkan cash-basis (realized): omset_realized - modal_realized
+  // Keuntungan Kotor contract-basis: omset_full - modal_full
   const realizedProfit = useMemo(() => monthlyData?.total_profit ?? 0, [monthlyData?.total_profit]);
 
-  // Keuntungan Bersih (net): realized profit dikurangi komisi dan biaya operasional
+  // Keuntungan Bersih (net): gross profit dikurangi komisi dan biaya operasional
   const netProfit = useMemo(() => {
     const profit = monthlyData?.total_profit ?? 0;
     const commission = monthlyData?.total_commission ?? 0;
     return profit - commission - totalExpenses;
   }, [monthlyData?.total_profit, monthlyData?.total_commission, totalExpenses]);
 
-  // Margin keuntungan kotor cash-basis: (omset_realized - modal_realized) / modal_realized * 100
-  // = "berapa % markup dari modal terealisasi yang sudah menghasilkan omset"
+  // Margin keuntungan kotor: (omset - modal) / modal * 100
   const grossProfitMargin = useMemo(() => {
     const modal = monthlyData?.total_modal ?? 0;
     const omset = monthlyData?.total_omset ?? 0;
@@ -218,10 +217,10 @@ export default function Dashboard() {
             <StatCard
               icon={DollarSign}
               iconColor="text-blue-500"
-              label="Modal Tertagih"
+              label="Total Modal"
               value={contractTotals.total_modal}
-              subtitle="Realized bulan ini"
-              hoverInfo="Modal yang sudah terealisasi proporsional dari pembayaran masuk bulan ini (cash basis)."
+              subtitle="Kontrak baru bulan ini"
+              hoverInfo="Total modal (harga pokok) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
             />
           </div>
 
@@ -229,10 +228,10 @@ export default function Dashboard() {
             <StatCard
               icon={Wallet}
               iconColor="text-indigo-500"
-              label="Omset Tertagih"
+              label="Total Omset"
               value={contractTotals.total_omset}
-              subtitle="Realized bulan ini"
-              hoverInfo="Omset (harga jual) yang diakui dari pembayaran masuk bulan ini, proporsional thd nilai kontrak."
+              subtitle="Kontrak baru bulan ini"
+              hoverInfo="Total omset (harga jual) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
             />
           </div>
 
@@ -243,8 +242,8 @@ export default function Dashboard() {
               label="Keuntungan Kotor"
               value={realizedProfit}
               valueColor="text-green-600"
-              subtitle="Omset − Modal (realized)"
-              hoverInfo="Keuntungan kotor dari uang yang sudah tertagih, sebelum dikurangi komisi & operasional."
+              subtitle="Omset − Modal"
+              hoverInfo="Keuntungan kotor dari kontrak-kontrak baru bulan ini, sebelum dikurangi komisi & operasional."
             />
           </div>
 
@@ -257,7 +256,7 @@ export default function Dashboard() {
               isPercentage
               valueColor={grossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
               subtitle="(Omset − Modal) / Modal"
-              hoverInfo="Persentase markup dari modal terealisasi. Mis: 25% berarti tiap Rp 100 modal hasilkan Rp 25 keuntungan kotor."
+              hoverInfo="Persentase markup dari modal. Mis: 25% berarti tiap Rp 100 modal hasilkan Rp 25 keuntungan kotor."
             />
           </div>
 
@@ -269,7 +268,7 @@ export default function Dashboard() {
               value={monthlyData?.total_commission ?? 0}
               valueColor="text-purple-600"
               subtitle="Semua sales bulan ini"
-              hoverInfo="Total komisi seluruh sales agent, dihitung dari omset tertagih × tier komisi masing-masing."
+              hoverInfo="Total komisi seluruh sales agent, dihitung dari nilai kontrak baru bulan ini × tier komisi masing-masing."
             />
           </div>
 
