@@ -187,10 +187,11 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
 
       .value-alamat {
         display: inline-block;
-        max-width: 50mm;
+        max-width: 70mm;
         overflow: hidden;
         text-overflow: ellipsis;
         vertical-align: bottom;
+        white-space: nowrap;
       }
 
       .red-text { 
@@ -270,7 +271,10 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
   };
 
   const truncateText = (text: string, maxLength: number) => {
+    if (!text) return "";
     if (text.length <= maxLength) return text;
+    // New behavior: if text is longer than maxLength, show first maxLength characters
+    // and append ellipsis (ellipsis is outside the maxLength).
     return text.substring(0, maxLength) + "...";
   };
 
@@ -291,6 +295,8 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
   // --- Data Preparation ---
   // noFakturBase removed; we'll build per-coupon identifier including installment index
   const displayAddress = contract.customers?.business_address || contract.customers?.address || "-";
+  // Truncated address for printing (max 35 chars)
+  const truncatedAddressForPrint = truncateText(displayAddress, 35);
   const couponPages = groupCouponsIntoPages(coupons);
 
   // Constants
@@ -461,17 +467,18 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
                 {contract.collectors?.collector_code || '-'}
               </span>
             </div>
-                        <div className="data-row">
-                            <span className="label">Nama</span>
-              <span className="value">: {truncateText(contract.customers?.name || "-", 20)}</span>
-                        </div>
+            <div className="data-row">
+              <span className="label">Nama</span>
+        <span className="value">: {truncateText(contract.customers?.name || "-", 30)}</span>
+            </div>
             <div className="data-row">
               <span className="label">No HP</span>
               <span className="value">: {contract.customers?.phone || '-'}</span>
             </div>
                         <div className="data-row">
                             <span className="label">Alamat</span>
-                            <span className="value value-alamat">: {truncateText(displayAddress, 22)}</span>
+                            <span className="value value-alamat">: {truncatedAddressForPrint}</span>
+                            
                         </div>
                         <div className="data-row">
                             <span className="label">Jatuh Tempo</span>
@@ -479,7 +486,7 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
                         </div>
             {/* Angsuran Ke row removed - included in No, Kupon field as installment/tenor/sales/collector */}
             <div className="data-row" >
-              <span style={{ fontWeight: 'bold' }} className="label">Rekening BRI( {REKENING_NUMBER})</span>
+              <span style={{ fontWeight: 'bold' }} className="label">Rekening BRI({REKENING_NUMBER})</span>
             </div>
             <div className="data-row">
               <span className="label">A.N SUMBER MUTIARA ELEKTRONIK</span>
