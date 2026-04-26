@@ -33,7 +33,7 @@ export const useAgentOmset = () => {
         { data: tiersData },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
-        supabase.from('credit_contracts').select('id, omset, total_loan_amount, sales_agent_id'),
+        supabase.from('credit_contracts').select('id, omset, total_loan_amount, sales_agent_id, status').neq('status', 'returned'),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
