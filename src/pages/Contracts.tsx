@@ -317,6 +317,8 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
+      // Keuntungan diinput per-hari di UI; simpan TOTAL = harian × tenor
+      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
 
       if (selectedContract) {
         await updateContract.mutateAsync({
@@ -332,7 +334,7 @@ export default function Contracts() {
           start_date: formData.start_date,
           status: formData.status,
             omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: formData.keuntungan || 0,
+            keuntungan: totalKeuntungan,
         } as any);
       } else {
         const { data: newContract } = await createContract.mutateAsync({
@@ -347,7 +349,7 @@ export default function Contracts() {
           start_date: formData.start_date,
           status: formData.status,
             omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: formData.keuntungan || 0,
+            keuntungan: totalKeuntungan,
         } as any);
         
         // Generate installment coupons for new active contracts
