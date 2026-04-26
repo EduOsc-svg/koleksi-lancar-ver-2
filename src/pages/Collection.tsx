@@ -281,6 +281,10 @@ export default function Collection() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="profit" className="mt-6">
+          <DailyProfitList />
+        </TabsContent>
       </Tabs>
     </div>
   );
