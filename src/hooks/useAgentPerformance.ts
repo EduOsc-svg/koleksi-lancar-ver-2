@@ -106,7 +106,8 @@ export const useAgentPerformance = () => {
         const commissionPct = total_omset > 0 ? calculateTieredCommission(total_omset, tiers) : 0;
         const totalCommission = (total_omset * commissionPct) / 100;
         const profit = total_omset - total_modal;
-        const profitMargin = total_omset > 0 ? (profit / total_omset) * 100 : 0;
+        // Margin = markup atas modal: (omset - modal) / modal × 100
+        const profitMargin = total_modal > 0 ? (profit / total_modal) * 100 : 0;
 
         return {
           agent_id: agent.id,
