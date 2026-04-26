@@ -762,7 +762,10 @@ export default function Contracts() {
                 
                 let statusVariant: "default" | "secondary" | "destructive" | "outline" = "default";
                 let statusLabel = "Lancar";
-                if (contract.status !== "active") {
+                if (contract.status === "returned") {
+                  statusVariant = "destructive";
+                  statusLabel = "Macet (Return)";
+                } else if (contract.status !== "active") {
                   statusVariant = "secondary";
                   statusLabel = "Selesai";
                 } else if (daysPerDueNum <= 1.2) {
