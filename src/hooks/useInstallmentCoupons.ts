@@ -18,12 +18,15 @@ export interface CouponWithContract extends InstallmentCoupon {
     daily_installment_amount: number;
     tenor_days: number;
     sales_agent_id: string | null;
+    collector_id: string | null;
+    current_installment_index: number;
     customers: {
       name: string;
       address: string | null;
       phone: string | null;
     } | null;
     sales_agents?: { name: string; agent_code: string } | null;
+    collectors?: { name: string; collector_code: string } | null;
   } | null;
 }
 
@@ -61,8 +64,11 @@ export const useTodayDueCoupons = () => {
             daily_installment_amount,
             tenor_days,
             sales_agent_id,
+            collector_id,
+            current_installment_index,
             customers(name, address, phone),
-            sales_agents(name, agent_code)
+            sales_agents(name, agent_code),
+            collectors(name, collector_code)
           )
         `)
         .eq('due_date', today)
