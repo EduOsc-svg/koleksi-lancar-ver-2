@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Pencil, Trash } from "lucide-react";
+import { Plus, Pencil, Trash, Wallet, ArrowLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { format, startOfMonth, addMonths, subMonths } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,9 +36,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { SearchInput } from "@/components/ui/search-input";
 import { TablePagination } from "@/components/TablePagination";
 import { usePagination } from "@/hooks/usePagination";
+import { formatRupiah } from "@/lib/format";
 import {
   useCollectors,
   useCreateCollector,
@@ -44,6 +48,11 @@ import {
   useDeleteCollector,
   Collector,
 } from "@/hooks/useCollectors";
+import {
+  useCollectorSalaries,
+  useSetCollectorSalary,
+  useCollectorSalaryTotal,
+} from "@/hooks/useCollectorSalaries";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -57,15 +66,25 @@ export default function Collectors() {
   const updateCollector = useUpdateCollector();
   const deleteCollector = useDeleteCollector();
 
+  // Bulan terpilih untuk gaji
+  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
+  const { data: salaryMap } = useCollectorSalaries(selectedMonth);
+  const totalSalary = useCollectorSalaryTotal(selectedMonth);
+  const setSalary = useSetCollectorSalary();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
+  const [salaryEditTarget, setSalaryEditTarget] = useState<Collector | null>(null);
+  const [salaryAmount, setSalaryAmount] = useState<number>(0);
   const [selectedCollector, setSelectedCollector] = useState<Collector | null>(null);
   const [highlightedRow, setHighlightedRow] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     collector_code: "",
     name: "",
     phone: "",
+    salary: 0,
   });
 
   // Filter collectors based on search query
@@ -101,32 +120,22 @@ export default function Collectors() {
     }
   }, [highlightId, collectors]);
 
+  const handlePrevMonth = () => setSelectedMonth((prev) => startOfMonth(subMonths(prev, 1)));
+  const handleNextMonth = () => setSelectedMonth((prev) => startOfMonth(addMonths(prev, 1)));
+
   const handleOpenCreate = () => {
     // Generate next collector code based on the most recent pattern
     const generateNextCode = () => {
       if (!collectors || collectors.length === 0) return "K001";
-      
-      // Sort collectors by creation date to get the most recent pattern
-      const sortedCollectors = [...collectors].sort((a, b) => 
+      const sortedCollectors = [...collectors].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-      
-      // Get the most recent code to determine the pattern
       const recentCode = sortedCollectors[0]?.collector_code;
-      
       if (!recentCode) return "K001";
-      
-      // Extract pattern from recent code
       const match = recentCode.match(/^([A-Z]+)(\d+)$/);
-      if (!match) {
-        // If no pattern found, use default
-        return "K001";
-      }
-      
+      if (!match) return "K001";
       const prefix = match[1];
       const numberLength = match[2].length;
-      
-      // Find all codes with the same prefix
       const existingNumbers = collectors
         .map(c => c.collector_code)
         .filter(code => code.startsWith(prefix))
@@ -135,16 +144,16 @@ export default function Collectors() {
           return numMatch ? parseInt(numMatch[1], 10) : 0;
         })
         .filter(num => !isNaN(num));
-      
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
       return `${prefix}${nextNumber.toString().padStart(numberLength, '0')}`;
     };
 
-    setFormData({ 
-      collector_code: generateNextCode(), 
-      name: "", 
-      phone: "" 
+    setFormData({
+      collector_code: generateNextCode(),
+      name: "",
+      phone: "",
+      salary: 0,
     });
     setSelectedCollector(null);
     setDialogOpen(true);
@@ -155,6 +164,7 @@ export default function Collectors() {
       collector_code: collector.collector_code,
       name: collector.name,
       phone: collector.phone || "",
+      salary: salaryMap?.get(collector.id)?.amount ?? 0,
     });
     setSelectedCollector(collector);
     setDialogOpen(true);
@@ -165,6 +175,12 @@ export default function Collectors() {
     setDeleteDialogOpen(true);
   };
 
+  const handleOpenSalaryEdit = (collector: Collector) => {
+    setSalaryEditTarget(collector);
+    setSalaryAmount(salaryMap?.get(collector.id)?.amount ?? 0);
+    setSalaryDialogOpen(true);
+  };
+
   const handleSubmit = async () => {
     if (!formData.collector_code.trim() || !formData.name.trim()) {
       toast.error("Kode dan nama kolektor wajib diisi");
@@ -172,29 +188,58 @@ export default function Collectors() {
     }
 
     try {
+      let savedCollector: Collector | null = null;
       if (selectedCollector) {
-        await updateCollector.mutateAsync({
+        const updated = await updateCollector.mutateAsync({
           id: selectedCollector.id,
-          ...formData,
+          collector_code: formData.collector_code,
+          name: formData.name,
           phone: formData.phone || null,
         });
+        savedCollector = updated as Collector;
         toast.success("Kolektor berhasil diperbarui");
       } else {
-        await createCollector.mutateAsync({
-          ...formData,
+        const created = await createCollector.mutateAsync({
+          collector_code: formData.collector_code,
+          name: formData.name,
           phone: formData.phone || null,
         });
+        savedCollector = created as Collector;
         toast.success("Kolektor berhasil ditambahkan");
       }
+
+      // Simpan gaji bulan terpilih jika diisi/diubah
+      if (savedCollector) {
+        const currentSalary = salaryMap?.get(savedCollector.id)?.amount ?? 0;
+        if ((formData.salary || 0) !== currentSalary) {
+          await setSalary.mutateAsync({
+            collector_id: savedCollector.id,
+            collector_name: savedCollector.name,
+            amount: formData.salary || 0,
+            month: selectedMonth,
+          });
+        }
+      }
+
       setDialogOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan data kolektor");
     }
   };
 
+  const handleSaveSalary = async () => {
+    if (!salaryEditTarget) return;
+    await setSalary.mutateAsync({
+      collector_id: salaryEditTarget.id,
+      collector_name: salaryEditTarget.name,
+      amount: salaryAmount || 0,
+      month: selectedMonth,
+    });
+    setSalaryDialogOpen(false);
+  };
+
   const handleDelete = async () => {
     if (!selectedCollector) return;
-
     try {
       await deleteCollector.mutateAsync(selectedCollector.id);
       toast.success("Kolektor berhasil dihapus");
@@ -206,12 +251,40 @@ export default function Collectors() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold">{t("Master Kolektor", "Master Kolektor")}</h2>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Kolektor Baru
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Month Selector */}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-3 py-2 bg-muted rounded-md text-sm font-medium min-w-[140px] text-center">
+              {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Kolektor Baru
+          </Button>
+        </div>
+      </div>
+
+      {/* Salary summary card */}
+      <div className="rounded-lg border bg-orange-50 dark:bg-orange-900/10 px-4 py-3 flex items-center gap-3">
+        <div className="h-9 w-9 rounded-full bg-orange-500/15 flex items-center justify-center">
+          <Wallet className="h-5 w-5 text-orange-600" />
+        </div>
+        <div className="flex-1">
+          <p className="text-xs text-muted-foreground">Total Gaji Kolektor — {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}</p>
+          <p className="text-lg font-bold text-orange-700 dark:text-orange-400">{formatRupiah(totalSalary)}</p>
+        </div>
+        <p className="text-xs text-muted-foreground max-w-xs text-right">
+          Otomatis terkalkulasi sebagai biaya operasional di Dashboard bulanan & rekap tahunan.
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -234,6 +307,7 @@ export default function Collectors() {
               <TableHead>Kode</TableHead>
               <TableHead>Nama</TableHead>
               <TableHead>No. Telepon</TableHead>
+              <TableHead className="text-right">Gaji Bulan Ini</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
@@ -241,56 +315,69 @@ export default function Collectors() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <div className="h-8 bg-muted animate-pulse rounded" />
                   </TableCell>
                 </TableRow>
               ))
             ) : paginatedItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   {searchQuery
                     ? `Tidak ada kolektor dengan kata kunci "${searchQuery}"`
                     : "Belum ada data kolektor"}
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedItems.map((collector, index) => (
-                <TableRow
-                  key={collector.id}
-                  id={`collector-row-${collector.id}`}
-                  className={
-                    highlightedRow === collector.id
-                      ? "bg-primary/10 transition-colors duration-300"
-                      : ""
-                  }
-                >
-                  <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{collector.collector_code}</Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{collector.name}</TableCell>
-                  <TableCell>{collector.phone || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEdit(collector)}
+              paginatedItems.map((collector, index) => {
+                const salary = salaryMap?.get(collector.id)?.amount ?? 0;
+                return (
+                  <TableRow
+                    key={collector.id}
+                    id={`collector-row-${collector.id}`}
+                    className={
+                      highlightedRow === collector.id
+                        ? "bg-primary/10 transition-colors duration-300"
+                        : ""
+                    }
+                  >
+                    <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{collector.collector_code}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{collector.name}</TableCell>
+                    <TableCell>{collector.phone || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSalaryEdit(collector)}
+                        className={`font-semibold hover:underline ${salary > 0 ? "text-orange-600" : "text-muted-foreground"}`}
+                        title="Klik untuk ubah gaji bulan ini"
                       >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDelete(collector)}
-                      >
-                        <Trash className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {formatRupiah(salary)}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEdit(collector)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDelete(collector)}
+                        >
+                          <Trash className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -321,67 +408,14 @@ export default function Collectors() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="collector_code">Kode Kolektor *</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="collector_code"
-                  value={formData.collector_code}
-                  onChange={(e) =>
-                    setFormData({ ...formData, collector_code: e.target.value })
-                  }
-                  placeholder="Contoh: K001, KOL001, COL001"
-                  className="flex-1"
-                />
-                {!selectedCollector && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Regenerate code using the same logic as handleOpenCreate
-                      const generateNextCode = () => {
-                        if (!collectors || collectors.length === 0) return "K001";
-                        
-                        const sortedCollectors = [...collectors].sort((a, b) => 
-                          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                        );
-                        
-                        const recentCode = sortedCollectors[0]?.collector_code;
-                        if (!recentCode) return "K001";
-                        
-                        const match = recentCode.match(/^([A-Z]+)(\d+)$/);
-                        if (!match) return "K001";
-                        
-                        const prefix = match[1];
-                        const numberLength = match[2].length;
-                        
-                        const existingNumbers = collectors
-                          .map(c => c.collector_code)
-                          .filter(code => code.startsWith(prefix))
-                          .map(code => {
-                            const numMatch = code.match(new RegExp(`^${prefix}(\\d+)$`));
-                            return numMatch ? parseInt(numMatch[1], 10) : 0;
-                          })
-                          .filter(num => !isNaN(num));
-                        
-                        const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-                        const nextNumber = maxNumber + 1;
-                        return `${prefix}${nextNumber.toString().padStart(numberLength, '0')}`;
-                      };
-                      
-                      setFormData({ ...formData, collector_code: generateNextCode() });
-                    }}
-                    className="px-3"
-                  >
-                    Auto
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {!selectedCollector 
-                  ? "Dapat diinput manual atau klik 'Auto' untuk mengikuti pola kode sebelumnya"
-                  : "Kode kolektor"
+              <Input
+                id="collector_code"
+                value={formData.collector_code}
+                onChange={(e) =>
+                  setFormData({ ...formData, collector_code: e.target.value })
                 }
-              </p>
+                placeholder="Contoh: K001, KOL001"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Nama *</Label>
@@ -405,6 +439,20 @@ export default function Collectors() {
                 placeholder="08xxxxxxxxxx"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="salary">
+                Gaji {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}
+              </Label>
+              <CurrencyInput
+                id="salary"
+                value={formData.salary}
+                onValueChange={(val) => setFormData({ ...formData, salary: val || 0 })}
+                placeholder="Rp 0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Gaji disimpan per bulan & otomatis dikurangkan dari keuntungan dashboard.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -412,11 +460,46 @@ export default function Collectors() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={createCollector.isPending || updateCollector.isPending}
+              disabled={createCollector.isPending || updateCollector.isPending || setSalary.isPending}
             >
-              {createCollector.isPending || updateCollector.isPending
+              {createCollector.isPending || updateCollector.isPending || setSalary.isPending
                 ? "Menyimpan..."
                 : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Salary-only edit dialog (klik di kolom Gaji) */}
+      <Dialog open={salaryDialogOpen} onOpenChange={setSalaryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Ubah Gaji — {salaryEditTarget?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Bulan: {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Gaji Bulan Ini</Label>
+              <CurrencyInput
+                value={salaryAmount}
+                onValueChange={(val) => setSalaryAmount(val || 0)}
+                placeholder="Rp 0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Set ke Rp 0 untuk menghapus catatan gaji bulan ini.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSalaryDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveSalary} disabled={setSalary.isPending}>
+              {setSalary.isPending ? "Menyimpan..." : "Simpan"}
             </Button>
           </DialogFooter>
         </DialogContent>
