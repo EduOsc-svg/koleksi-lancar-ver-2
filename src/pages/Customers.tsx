@@ -385,12 +385,21 @@ export default function Customers() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">{t("customers.name")} *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t("customers.name")}
-              />
+              {(() => {
+                const normalized = formData.phone.replace(/\D/g, '');
+                const existingByPhone = !selectedCustomer && normalized.length >= 6
+                  ? customers?.find((c) => (c.phone || '').replace(/\D/g, '') === normalized)
+                  : null;
+                const namePlaceholder = existingByPhone ? existingByPhone.name : t("customers.name");
+                return (
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder={namePlaceholder}
+                  />
+                );
+              })()}
             </div>
             <div>
               <Label htmlFor="nik">{t("customers.nik")}</Label>
