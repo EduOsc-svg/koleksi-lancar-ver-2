@@ -262,7 +262,16 @@ export default function Contracts() {
     setDialogOpen(true);
   };
 
+  // Kontrak hanya bisa diedit jika belum ada transaksi (belum ada cicilan terbayar)
+  const hasTransactions = (contract: ContractWithCustomer) => {
+    return (contract.current_installment_index || 0) > 0;
+  };
+
   const handleOpenEdit = (contract: ContractWithCustomer) => {
+    if (hasTransactions(contract)) {
+      toast.error("Kontrak tidak dapat diedit karena sudah ada transaksi pembayaran");
+      return;
+    }
     setSelectedContract(contract);
     setFormData({
       contract_ref: contract.contract_ref,
