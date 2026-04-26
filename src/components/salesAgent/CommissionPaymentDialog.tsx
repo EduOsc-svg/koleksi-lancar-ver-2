@@ -137,7 +137,7 @@ export function CommissionPaymentDialog({
                       <TableRow>
                         <TableHead>Kode Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
-                        <TableHead>Omset</TableHead>
+                        <TableHead>Omset by Kontrak</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
