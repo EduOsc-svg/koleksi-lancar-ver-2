@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { FileText, CreditCard, AlertCircle } from "lucide-react";
+import { FileText, CreditCard, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { useCreateCouponHandover, useCouponHandovers } from "@/hooks/useCouponHa
 import { ManifestFilters } from "@/components/collection/ManifestFilters";
 import { ManifestTable } from "@/components/collection/ManifestTable";
 import { DailyDueList } from "@/components/collection/DailyDueList";
+import { DailyProfitList } from "@/components/collection/DailyProfitList";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePaymentsByContract } from "@/hooks/usePayments";
@@ -149,7 +150,7 @@ export default function Collection() {
 
       {/* Tabs */}
       <Tabs defaultValue="manifest" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-xl">
+        <TabsList className="grid w-full grid-cols-4 max-w-3xl">
           <TabsTrigger value="manifest" className="gap-2">
             <FileText className="h-4 w-4" />
             Manifest
@@ -161,6 +162,10 @@ export default function Collection() {
           <TabsTrigger value="outstanding" className="gap-2">
             <AlertCircle className="h-4 w-4" />
             Belum Bayar
+          </TabsTrigger>
+          <TabsTrigger value="profit" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Keuntungan Harian
           </TabsTrigger>
         </TabsList>
 
