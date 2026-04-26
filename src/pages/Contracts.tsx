@@ -317,8 +317,9 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
-      // Keuntungan diinput per-hari di UI; simpan TOTAL = harian × tenor
-      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
+      // Keuntungan dihitung OTOMATIS: (Total Pinjaman − Modal Efektif). Disimpan sebagai TOTAL keuntungan.
+      const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
+      const totalKeuntungan = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
 
       if (selectedContract) {
         await updateContract.mutateAsync({
@@ -394,7 +395,8 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
-      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
+      const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
+      const totalKeuntungan = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
 
       const { data: newContract } = await createContract.mutateAsync({
         contract_ref: formData.contract_ref,
