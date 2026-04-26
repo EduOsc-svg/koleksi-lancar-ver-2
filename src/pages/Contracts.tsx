@@ -276,7 +276,12 @@ export default function Contracts() {
       status: contract.status,
       modal: (contract as any).omset || 0,
       dp: 0,
-      keuntungan: (contract as any).keuntungan || 0,
+      // Convert stored TOTAL keuntungan -> per-day for UI display
+      keuntungan: (() => {
+        const totalKeuntungan = (contract as any).keuntungan || 0;
+        const tenor = contract.tenor_days || 0;
+        return tenor > 0 ? Math.round(totalKeuntungan / tenor) : 0;
+      })(),
     });
     setDialogOpen(true);
   };
@@ -312,6 +317,8 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
+      // Keuntungan diinput per-hari di UI; simpan TOTAL = harian × tenor
+      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
 
       if (selectedContract) {
         await updateContract.mutateAsync({
@@ -327,7 +334,7 @@ export default function Contracts() {
           start_date: formData.start_date,
           status: formData.status,
             omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: formData.keuntungan || 0,
+            keuntungan: totalKeuntungan,
         } as any);
       } else {
         const { data: newContract } = await createContract.mutateAsync({
@@ -342,7 +349,7 @@ export default function Contracts() {
           start_date: formData.start_date,
           status: formData.status,
             omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: formData.keuntungan || 0,
+            keuntungan: totalKeuntungan,
         } as any);
         
         // Generate installment coupons for new active contracts
@@ -387,6 +394,7 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
+      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
 
       const { data: newContract } = await createContract.mutateAsync({
         contract_ref: formData.contract_ref,
@@ -400,6 +408,7 @@ export default function Contracts() {
         start_date: formData.start_date,
         status: formData.status,
         omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+        keuntungan: totalKeuntungan,
       } as any);
 
       // Generate installment coupons for new active contracts
@@ -1071,15 +1080,18 @@ export default function Contracts() {
                   </div>
                 </div>
                   <div>
-                    <Label htmlFor="keuntungan">Keuntungan (opsional)</Label>
+                    <Label htmlFor="keuntungan">Keuntungan Harian (opsional)</Label>
                     <CurrencyInput
                       id="keuntungan"
                       value={formData.keuntungan}
                       onValueChange={(val) => setFormData({ ...formData, keuntungan: val || 0 })}
-                      placeholder="Rp 0"
+                      placeholder="Rp 0 / hari"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Jika tidak diisi, keuntungan akan dihitung otomatis dari Omset - Modal Efektif
+                      Diinput per hari. Total keuntungan = {formatRupiah((formData.keuntungan || 0) * (parseInt(formData.tenor_days) || 0))} ({formData.tenor_days || 0} hari)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Jika kosong, keuntungan dihitung otomatis dari Omset − Modal Efektif.
                     </p>
                   </div>
             </div>

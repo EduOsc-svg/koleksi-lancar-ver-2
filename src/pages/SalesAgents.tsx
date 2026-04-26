@@ -300,13 +300,14 @@ export default function SalesAgents() {
     };
 
     // ===== SHEET 1: Semua Sales =====
-    const HEADERS_1 = ['No', 'Kode Sales', 'Nama', 'Telepon', 'Komisi % (Dinamis)', 'Total Omset', 'Komisi (Berdasarkan Tier)', 'Jumlah Kontrak'];
-    const COL_WIDTHS_1 = [5, 14, 22, 18, 20, 22, 25, 16];
+    // Kolom dihapus per request user: Kode Sales (juga tanggal/kolektor/kode kolektor/status/sisa - tidak relevan di sheet ini)
+    const HEADERS_1 = ['No', 'Nama', 'Telepon', 'Komisi % (Dinamis)', 'Total Omset', 'Komisi (Berdasarkan Tier)', 'Jumlah Kontrak'];
+    const COL_WIDTHS_1 = [5, 22, 18, 20, 22, 25, 16];
 
     const ws1 = workbook.addWorksheet('Semua Sales');
 
     // Title row
-    ws1.mergeCells('A1:H1');
+    ws1.mergeCells('A1:G1');
     const titleCell = ws1.getCell('A1');
     titleCell.value = 'LAPORAN SALES AGENT';
     titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
@@ -314,7 +315,7 @@ export default function SalesAgents() {
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
     // Date row
-    ws1.mergeCells('A2:H2');
+    ws1.mergeCells('A2:G2');
     const dateCell = ws1.getCell('A2');
     dateCell.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
     dateCell.font = { italic: true, size: 12 };
@@ -334,32 +335,32 @@ export default function SalesAgents() {
     const startRow1 = hRow1.number + 1;
 
     agents.forEach((agent, i) => {
-  const rowNum = startRow1 + i;
-  const omsetData = getAgentOmset(agent.id);
-  // Use booked omset if available so commission follows displayed omset
-  const displayOmset = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
-  const dynamicPct = calculateTieredCommission(displayOmset, commissionTiers) / 100;
+      const rowNum = startRow1 + i;
+      const omsetData = getAgentOmset(agent.id);
+      // Use booked omset if available so commission follows displayed omset
+      const displayOmset = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
+      const dynamicPct = calculateTieredCommission(displayOmset, commissionTiers) / 100;
 
+      // Layout baru: No | Nama | Telepon | Komisi % | Omset | Komisi | Jumlah Kontrak
       const dataRow = ws1.addRow([
         i + 1,
-        agent.agent_code,
         agent.name,
         agent.phone || '-',
         dynamicPct,
         displayOmset,
-        { formula: `F${rowNum}*E${rowNum}` },
+        { formula: `E${rowNum}*D${rowNum}` },
         omsetData?.total_contracts || 0,
       ]);
 
       dataRow.eachCell((cell, colNumber) => {
         cell.border = THIN_BORDER;
-        if (colNumber === 5) {
+        if (colNumber === 4) {
           cell.numFmt = '0.00%';
           cell.alignment = { horizontal: 'center' };
-        } else if ([6, 7].includes(colNumber)) {
+        } else if ([5, 6].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
-        } else if ([1, 8].includes(colNumber)) {
+        } else if ([1, 7].includes(colNumber)) {
           cell.alignment = { horizontal: 'center' };
         }
       });
@@ -369,19 +370,19 @@ export default function SalesAgents() {
     if (agents.length > 0) {
       const endRow1 = startRow1 + agents.length - 1;
       const totalRow1 = ws1.addRow([
-        '', '', '', 'TOTAL', '',
+        '', '', 'TOTAL', '',
+        { formula: `SUM(E${startRow1}:E${endRow1})` },
         { formula: `SUM(F${startRow1}:F${endRow1})` },
         { formula: `SUM(G${startRow1}:G${endRow1})` },
-        { formula: `SUM(H${startRow1}:H${endRow1})` },
       ]);
       totalRow1.eachCell((cell, colNumber) => {
         cell.font = { bold: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
         cell.border = { top: { style: 'double' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
-        if ([6, 7].includes(colNumber)) {
+        if ([5, 6].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
-        } else if (colNumber === 8) {
+        } else if (colNumber === 7) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
         }
@@ -391,9 +392,10 @@ export default function SalesAgents() {
     ws1.columns = COL_WIDTHS_1.map((width) => ({ width }));
 
     // ===== SHEET 2+: Per Sales Agent (Cash Basis) =====
+    // Kolom Tanggal dihapus per request user
     // Omset = total sudah dibayar (cash basis), bukan total_loan_amount mentah
-    const HEADERS_2 = ['No', 'Tanggal', 'Kode Kontrak', 'Produk', 'Nama Konsumen', 'Telepon Konsumen', 'Omset Tertagih'];
-    const COL_WIDTHS_2 = [5, 14, 18, 25, 25, 20, 22];
+    const HEADERS_2 = ['No', 'Kode Kontrak', 'Produk', 'Nama Konsumen', 'Telepon Konsumen', 'Omset Tertagih'];
+    const COL_WIDTHS_2 = [5, 18, 25, 25, 20, 22];
 
     agents.forEach((agent) => {
       const agentContracts = (allContracts || []).filter(
@@ -404,14 +406,14 @@ export default function SalesAgents() {
       const sheet = workbook.addWorksheet(safeName);
 
       // Title
-      sheet.mergeCells('A1:G1');
+      sheet.mergeCells('A1:F1');
       const t1 = sheet.getCell('A1');
       t1.value = `LAPORAN DETAIL - ${agent.name.toUpperCase()} (${agent.agent_code})`;
       t1.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
       t1.alignment = { horizontal: 'center' };
       t1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
-      sheet.mergeCells('A2:G2');
+      sheet.mergeCells('A2:F2');
       const d1 = sheet.getCell('A2');
       d1.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} (Cash Basis)`;
       d1.font = { italic: true, size: 12 };
@@ -433,7 +435,6 @@ export default function SalesAgents() {
         const omsetRealized = paidByContract.get(contract.id) || 0;
         const dataRow = sheet.addRow([
           idx + 1,
-          contract.start_date,
           contract.contract_ref,
           contract.product_type || '-',
           contract.customers?.name || '-',
@@ -443,7 +444,7 @@ export default function SalesAgents() {
 
         dataRow.eachCell((cell, colNumber) => {
           cell.border = THIN_BORDER;
-          if (colNumber === 7) {
+          if (colNumber === 6) {
             cell.numFmt = '"Rp "#,##0';
             cell.alignment = { horizontal: 'right' };
           } else if (colNumber === 1) {
@@ -456,14 +457,14 @@ export default function SalesAgents() {
       if (agentContracts.length > 0) {
         const endRow = startRow + agentContracts.length - 1;
         const totalRow = sheet.addRow([
-          '', '', '', '', '', 'TOTAL',
-          { formula: `SUM(G${startRow}:G${endRow})` },
+          '', '', '', '', 'TOTAL',
+          { formula: `SUM(F${startRow}:F${endRow})` },
         ]);
         totalRow.eachCell((cell, colNumber) => {
           cell.font = { bold: true };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
           cell.border = { top: { style: 'double' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
-          if (colNumber === 7) {
+          if (colNumber === 6) {
             cell.numFmt = '"Rp "#,##0';
             cell.alignment = { horizontal: 'right' };
           }
