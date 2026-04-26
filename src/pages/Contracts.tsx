@@ -276,7 +276,12 @@ export default function Contracts() {
       status: contract.status,
       modal: (contract as any).omset || 0,
       dp: 0,
-      keuntungan: (contract as any).keuntungan || 0,
+      // Convert stored TOTAL keuntungan -> per-day for UI display
+      keuntungan: (() => {
+        const totalKeuntungan = (contract as any).keuntungan || 0;
+        const tenor = contract.tenor_days || 0;
+        return tenor > 0 ? Math.round(totalKeuntungan / tenor) : 0;
+      })(),
     });
     setDialogOpen(true);
   };
