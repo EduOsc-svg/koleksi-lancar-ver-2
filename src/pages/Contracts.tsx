@@ -1080,19 +1080,30 @@ export default function Contracts() {
                   </div>
                 </div>
                   <div>
-                    <Label htmlFor="keuntungan">Keuntungan Harian (opsional)</Label>
-                    <CurrencyInput
-                      id="keuntungan"
-                      value={formData.keuntungan}
-                      onValueChange={(val) => setFormData({ ...formData, keuntungan: val || 0 })}
-                      placeholder="Rp 0 / hari"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Diinput per hari. Total keuntungan = {formatRupiah((formData.keuntungan || 0) * (parseInt(formData.tenor_days) || 0))} ({formData.tenor_days || 0} hari)
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Jika kosong, keuntungan dihitung otomatis dari Omset − Modal Efektif.
-                    </p>
+                    <Label htmlFor="keuntungan">Keuntungan Harian (otomatis)</Label>
+                    {(() => {
+                      const tenor = parseInt(formData.tenor_days) || 0;
+                      const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
+                      const totalProfit = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
+                      const dailyProfit = tenor > 0 ? Math.round(totalProfit / tenor) : 0;
+                      return (
+                        <>
+                          <CurrencyInput
+                            id="keuntungan"
+                            value={dailyProfit}
+                            disabled
+                            readOnly
+                            placeholder="Rp 0 / hari"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Rumus: (Total Pinjaman − Modal Efektif) ÷ Tenor = ({formatRupiah(formData.total_loan_amount || 0)} − {formatRupiah(modalEfektif)}) ÷ {tenor || 0}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Total keuntungan = {formatRupiah(totalProfit)} ({tenor} hari)
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
             </div>
           </div>
