@@ -433,6 +433,40 @@ export default function Customers() {
                 placeholder="e.g., 08123456789"
                 maxLength={20}
               />
+              {(() => {
+                // Hanya untuk mode create (bukan edit) & nomor minimal 6 digit
+                if (selectedCustomer) return null;
+                const normalized = formData.phone.replace(/\D/g, '');
+                if (normalized.length < 6) return null;
+                const existing = customers?.find(
+                  (c) => (c.phone || '').replace(/\D/g, '') === normalized
+                );
+                if (!existing) return null;
+                return (
+                  <div className="mt-1 flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs dark:border-amber-700 dark:bg-amber-950">
+                    <span className="text-amber-800 dark:text-amber-200">
+                      Nomor sudah terdaftar atas nama: <strong>{existing.name}</strong>
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        setFormData({
+                          name: existing.name,
+                          nik: existing.nik || '',
+                          address: existing.address || '',
+                          business_address: existing.business_address || '',
+                          phone: existing.phone || '',
+                        });
+                      }}
+                    >
+                      Gunakan data
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
             <div className="col-span-2">
               <Label htmlFor="address">{t("customers.address")} (Alamat Tinggal)</Label>
