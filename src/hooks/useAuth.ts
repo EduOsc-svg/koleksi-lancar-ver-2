@@ -8,16 +8,17 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST (jangan ubah isLoading di sini —
+    // INITIAL_SESSION bisa fire dengan session=null sebelum restore selesai)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        setIsLoading(false);
       }
     );
 
-    // THEN check for existing session
+    // THEN restore existing session dari storage. Hanya di sinilah
+    // isLoading boleh di-set false, agar ProtectedRoute tidak redirect prematur.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
