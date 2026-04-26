@@ -140,6 +140,8 @@ export default function CustomerHistory() {
   } = usePagination(filteredCustomers, ITEMS_PER_PAGE);
 
   const selectedContract = contracts?.find((c) => c.id === selectedContractId);
+  const selectedCustomer = customers?.find((c) => c.id === selectedCustomerId);
+  const { data: coupons } = useCouponsByContract(selectedContractId || null);
   const progress = selectedContract
     ? (selectedContract.current_installment_index / selectedContract.tenor_days) * 100
     : 0;
@@ -148,6 +150,27 @@ export default function CustomerHistory() {
   const selectedContractDynamicStatus = selectedContract 
     ? calculateContractStatus(selectedContract) 
     : null;
+
+  // Tanggal jatuh tempo = due_date kupon unpaid berikutnya
+  const nextDueCoupon = coupons?.find((c) => c.status === 'unpaid');
+  const nextDueDate = nextDueCoupon?.due_date || null;
+
+  // Catatan keterlambatan: hitung kupon unpaid yang due_date < hari ini
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueCoupons = coupons?.filter(
+    (c) => c.status === 'unpaid' && new Date(c.due_date) < today
+  ) || [];
+  const overdueCount = overdueCoupons.length;
+  const oldestOverdue = overdueCoupons[0]?.due_date;
+  const daysLate = oldestOverdue
+    ? differenceInDays(today, new Date(oldestOverdue))
+    : 0;
+  const lateNote = overdueCount > 0
+    ? `Terlambat ${overdueCount} kupon (${daysLate} hari sejak ${formatDate(oldestOverdue!)})`
+    : selectedContract?.status === 'completed'
+      ? 'Kontrak telah lunas'
+      : 'Tidak ada keterlambatan';
 
   return (
     <div className="space-y-6">
