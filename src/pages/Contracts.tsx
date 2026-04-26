@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye, Printer, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, Printer, Check, ChevronsUpDown, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +121,7 @@ export default function Contracts() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
@@ -524,6 +525,40 @@ export default function Contracts() {
     }
   };
 
+  const handleReturn = async () => {
+    if (!selectedContract) return;
+    try {
+      // Tandai kontrak sebagai returned (macet permanen)
+      await updateContract.mutateAsync({
+        id: selectedContract.id,
+        status: "returned",
+      });
+      // Batalkan kupon yang masih unpaid agar tidak menambah outstanding/sisa tagihan
+      const { error: cErr } = await supabase
+        .from("installment_coupons")
+        .update({ status: "cancelled" })
+        .eq("contract_id", selectedContract.id)
+        .eq("status", "unpaid");
+      if (cErr) console.warn("Gagal cancel kupon:", cErr);
+
+      // Refresh data terkait
+      queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["agent_performance_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["agent_omset_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary"] });
+
+      toast.success("Kontrak ditandai Macet (Return). Sisa tagihan & omset sales otomatis menyesuaikan.");
+      setReturnDialogOpen(false);
+      setSelectedContract(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal me-return kontrak");
+    }
+  };
+
   const handlePrintAllCoupons = () => {
     // Default print path uses currently loaded coupons from hook
     if (!selectedContractCoupons?.length) {
@@ -727,7 +762,10 @@ export default function Contracts() {
                 
                 let statusVariant: "default" | "secondary" | "destructive" | "outline" = "default";
                 let statusLabel = "Lancar";
-                if (contract.status !== "active") {
+                if (contract.status === "returned") {
+                  statusVariant = "destructive";
+                  statusLabel = "Macet (Return)";
+                } else if (contract.status !== "active") {
                   statusVariant = "secondary";
                   statusLabel = "Selesai";
                 } else if (daysPerDueNum <= 1.2) {
@@ -769,12 +807,26 @@ export default function Contracts() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(contract)} title="Lihat Detail">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      {contract.status !== "returned" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Return Kontrak (tandai Macet)"
+                          onClick={() => {
+                            setSelectedContract(contract);
+                            setReturnDialogOpen(true);
+                          }}
+                        >
+                          <Undo2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Hapus"
                         onClick={() => {
                           setSelectedContract(contract);
                           setDeleteDialogOpen(true);
@@ -1328,6 +1380,32 @@ export default function Contracts() {
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Hapus</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Return Confirmation */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return Kontrak?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kontrak <b>{selectedContract?.contract_ref}</b> akan ditandai <b>Macet (Return)</b>.
+              <br /><br />
+              Dampak:
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                <li>Data kontrak <b>tetap tersimpan</b> sebagai riwayat.</li>
+                <li>Sisa tagihan (kupon belum bayar) <b>dibatalkan</b> — outstanding berkurang.</li>
+                <li>Omset, modal & komisi sales dari kontrak ini <b>tidak lagi dihitung</b>.</li>
+                <li>Komisi yang sudah dibayar ke sales <b>tidak ditarik kembali</b>.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReturn} className="bg-destructive hover:bg-destructive/90">
+              Ya, Return Kontrak
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

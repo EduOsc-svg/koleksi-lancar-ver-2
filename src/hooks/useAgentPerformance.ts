@@ -52,11 +52,12 @@ export const useAgentPerformance = () => {
         { data: tiersData },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
-        supabase.from('credit_contracts').select('id, omset, total_loan_amount, sales_agent_id'),
+        supabase.from('credit_contracts').select('id, omset, total_loan_amount, sales_agent_id, status').neq('status', 'returned'),
         supabase
           .from('installment_coupons')
-          .select('amount, contract_id, credit_contracts!inner(sales_agent_id)')
-          .eq('status', 'unpaid'),
+          .select('amount, contract_id, credit_contracts!inner(sales_agent_id, status)')
+          .eq('status', 'unpaid')
+          .neq('credit_contracts.status', 'returned'),
         supabase.from('payment_logs').select('amount_paid, contract_id'),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
@@ -106,7 +107,8 @@ export const useAgentPerformance = () => {
         const commissionPct = total_omset > 0 ? calculateTieredCommission(total_omset, tiers) : 0;
         const totalCommission = (total_omset * commissionPct) / 100;
         const profit = total_omset - total_modal;
-        const profitMargin = total_omset > 0 ? (profit / total_omset) * 100 : 0;
+        // Margin = markup atas modal: (omset - modal) / modal × 100
+        const profitMargin = total_modal > 0 ? (profit / total_modal) * 100 : 0;
 
         return {
           agent_id: agent.id,

@@ -56,7 +56,8 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
         supabase
           .from('credit_contracts')
-          .select('id, omset, total_loan_amount, sales_agent_id, start_date')
+          .select('id, omset, total_loan_amount, sales_agent_id, start_date, status')
+          .neq('status', 'returned')
           .gte('start_date', monthStart)
           .lte('start_date', monthEnd),
         supabase
@@ -128,7 +129,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         const commissionPct = total_omset > 0 ? calculateTieredCommission(total_omset, tiers) : 0;
         const totalCommission = (total_omset * commissionPct) / 100;
         const profit = total_omset - total_modal;
-        const profitMargin = total_omset > 0 ? (profit / total_omset) * 100 : 0;
+        const profitMargin = total_modal > 0 ? (profit / total_modal) * 100 : 0;
 
         return {
           agent_id: agent.id,
@@ -151,7 +152,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
       const total_collected = agentResults.reduce((s, a) => s + a.total_collected, 0);
-      const profit_margin = total_omset > 0 ? (total_profit / total_omset) * 100 : 0;
+      const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {
         total_modal,

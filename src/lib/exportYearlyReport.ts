@@ -54,7 +54,7 @@ export const exportYearlyReportToExcel = async (
     ['Lancar', data.lancar_count, '#,##0', 'Status pembayaran lancar'],
     ['Kurang Lancar', data.kurang_lancar_count, '#,##0', 'Status pembayaran kurang lancar'],
     ['Macet', data.macet_count, '#,##0', 'Status pembayaran macet'],
-    ['Margin Keuntungan', data.profit_margin / 100, '0.0%', 'Persentase keuntungan dari omset'],
+    ['Margin Keuntungan', data.profit_margin / 100, '0.0%', 'Markup atas modal: (omset − modal) / modal'],
     ['Total Tertagih', data.total_collected, '"Rp "#,##0', 'Total pembayaran diterima'],
     ['Sisa Tagihan', data.total_to_collect, '"Rp "#,##0', 'Total tagihan belum terbayar'],
     ['Tingkat Penagihan', data.collection_rate / 100, '0.0%', 'Efektivitas penagihan'],

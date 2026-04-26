@@ -169,6 +169,8 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       // Process kontrak: alokasikan FULL ke bulan start_date
       (contracts || []).forEach((contract: any) => {
         if (!contract.start_date) return;
+        // Exclude kontrak yang di-return (macet permanen)
+        if (contract.status === 'returned') return;
         const startDate = new Date(contract.start_date);
         if (startDate.getFullYear() !== selectedYear) return;
 
@@ -283,6 +285,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       (contracts || []).forEach((contract: any) => {
         const startYear = new Date(contract.start_date).getFullYear();
         if (startYear !== selectedYear) return;
+        if (contract.status === 'returned') return;
         const dynamicStatus = calculateContractStatus(contract);
         if (statusFilter !== 'all' && dynamicStatus !== statusFilter) return;
         totalContractsCount++;
@@ -298,7 +301,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const totalToCollect = (unpaidCoupons || []).reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
       const netProfit = totalProfit - totalCommission - totalExpenses;
       const netProfitPct = totalOmset > 0 ? (netProfit / totalOmset) * 100 : 0;
-      const profitMargin = totalOmset > 0 ? (totalProfit / totalOmset) * 100 : 0;
+      const profitMargin = totalModal > 0 ? (totalProfit / totalModal) * 100 : 0;
       const expectedTotal = totalToCollect + totalCollected;
       const collectionRate = expectedTotal > 0 ? (totalCollected / expectedTotal) * 100 : 0;
 
