@@ -121,6 +121,7 @@ export default function Contracts() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
@@ -521,6 +522,40 @@ export default function Contracts() {
       setSelectedContract(null);
     } catch (error) {
       toast.error("Gagal menghapus kontrak");
+    }
+  };
+
+  const handleReturn = async () => {
+    if (!selectedContract) return;
+    try {
+      // Tandai kontrak sebagai returned (macet permanen)
+      await updateContract.mutateAsync({
+        id: selectedContract.id,
+        status: "returned",
+      });
+      // Batalkan kupon yang masih unpaid agar tidak menambah outstanding/sisa tagihan
+      const { error: cErr } = await supabase
+        .from("installment_coupons")
+        .update({ status: "cancelled" })
+        .eq("contract_id", selectedContract.id)
+        .eq("status", "unpaid");
+      if (cErr) console.warn("Gagal cancel kupon:", cErr);
+
+      // Refresh data terkait
+      queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["agent_performance_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["agent_omset_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract"] });
+      queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary"] });
+
+      toast.success("Kontrak ditandai Macet (Return). Sisa tagihan & omset sales otomatis menyesuaikan.");
+      setReturnDialogOpen(false);
+      setSelectedContract(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal me-return kontrak");
     }
   };
 
