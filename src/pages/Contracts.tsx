@@ -394,6 +394,7 @@ export default function Contracts() {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
+      const totalKeuntungan = (formData.keuntungan || 0) * tenorDays;
 
       const { data: newContract } = await createContract.mutateAsync({
         contract_ref: formData.contract_ref,
@@ -407,6 +408,7 @@ export default function Contracts() {
         start_date: formData.start_date,
         status: formData.status,
         omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+        keuntungan: totalKeuntungan,
       } as any);
 
       // Generate installment coupons for new active contracts
