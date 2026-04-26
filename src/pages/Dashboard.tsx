@@ -274,6 +274,18 @@ export default function Dashboard() {
 
           <div className="w-[180px] flex-shrink-0">
             <StatCard
+              icon={CheckCircle}
+              iconColor="text-teal-500"
+              label="Tertagih"
+              value={totalCollected}
+              valueColor="text-teal-600"
+              subtitle="Pembayaran masuk bulan ini"
+              hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak."
+            />
+          </div>
+
+          <div className="w-[180px] flex-shrink-0">
+            <StatCard
               icon={Settings}
               iconColor="text-orange-500"
               label="Biaya Operasional"
