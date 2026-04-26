@@ -394,7 +394,7 @@ export default function SalesAgents() {
     // ===== SHEET 2+: Per Sales Agent (Cash Basis) =====
     // Kolom Tanggal dihapus per request user
     // Omset = total sudah dibayar (cash basis), bukan total_loan_amount mentah
-    const HEADERS_2 = ['No', 'Kode Kontrak', 'Produk', 'Nama Konsumen', 'Telepon Konsumen', 'Omset Tertagih'];
+    const HEADERS_2 = ['No', 'Kode Kontrak', 'Produk', 'Nama Konsumen', 'Telepon Konsumen', 'Omset by Kontrak'];
     const COL_WIDTHS_2 = [5, 18, 25, 25, 20, 22];
 
     agents.forEach((agent) => {
@@ -432,14 +432,15 @@ export default function SalesAgents() {
       const startRow = hRow.number + 1;
 
       agentContracts.forEach((contract: any, idx: number) => {
-        const omsetRealized = paidByContract.get(contract.id) || 0;
+        // Omset by kontrak = nilai penuh kontrak (bukan cash basis)
+        const omsetByContract = Number(contract.total_loan_amount || 0);
         const dataRow = sheet.addRow([
           idx + 1,
           contract.contract_ref,
           contract.product_type || '-',
           contract.customers?.name || '-',
           contract.customers?.phone || '-',
-          omsetRealized,
+          omsetByContract,
         ]);
 
         dataRow.eachCell((cell, colNumber) => {
