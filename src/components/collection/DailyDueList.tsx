@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, AlertTriangle, Search, Wallet } from "lucide-react";
+import { CalendarClock, CheckCircle2, AlertTriangle, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,79 +18,105 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { formatRupiah } from "@/lib/format";
-import { useTodayDueCoupons, type CouponWithContract } from "@/hooks/useInstallmentCoupons";
+import { useCouponHandovers, type CouponHandover } from "@/hooks/useCouponHandovers";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLogActivity } from "@/hooks/useActivityLog";
 
 /**
- * DailyDueList — Replaces the manual PaymentForm.
+ * DailyDueList — Sinkron dengan tab "Belum Bayar".
  *
- * Flow:
- *  1. Lists customers with installment coupons due TODAY (from installment_coupons table).
- *  2. Customers already paid for today are NOT shown (auto-removed).
- *  3. Each row has a "Bayar" action that opens a dialog form.
- *  4. In the dialog, the collector enters the number of "kupon kembali" (returned/unpaid).
- *     - Default = 0 → assume all of today's coupons are PAID.
- *     - Coupons NOT marked as kembali are recorded as PAID automatically.
- *     - Coupons marked as kembali stay UNPAID and show up in "Belum Bayar".
+ * Sumber data: `coupon_handovers` (kupon yang sudah keluar/diserahterimakan ke kolektor).
+ * "Kupon hari ini" = jumlah kupon yang masih BELUM LUNAS dari setiap batch handover
+ * (unpaidInRange = coupon_count - paidInRange, di mana paidInRange dihitung
+ * berdasarkan `credit_contracts.current_installment_index`).
  *
- * The list refreshes automatically based on installment_coupons.due_date == today.
+ * Logika pembayaran:
+ *  - Default Kupon Kembali = 0 → semua kupon outstanding dianggap LUNAS.
+ *  - Kupon yang ditandai kembali tetap UNPAID & muncul di "Belum Bayar".
+ *  - Pelanggan yang sudah lunas (unpaidInRange = 0) otomatis HILANG dari daftar.
  */
+
+interface DueRow {
+  handover_id: string;
+  contract_id: string;
+  contract_ref: string;
+  customer_name: string;
+  collector_id: string | null;
+  collector_name: string | null;
+  daily_amount: number;
+  start_index: number;
+  end_index: number;
+  current_installment_index: number;
+  paid_count: number;
+  unpaid_count: number;
+  // installment indices (1-based) yang masih outstanding pada batch ini
+  unpaid_indices: number[];
+}
+
+function buildRow(h: CouponHandover): DueRow | null {
+  if (!h.credit_contracts) return null;
+  const currentIndex = h.credit_contracts.current_installment_index || 0;
+  const paidInRange = Math.max(
+    0,
+    Math.min(currentIndex, h.end_index) - h.start_index + 1,
+  );
+  const paid = Math.max(0, paidInRange);
+  const unpaid = h.coupon_count - paid;
+  if (unpaid <= 0) return null;
+
+  // Kupon outstanding = index dari max(start_index, currentIndex+1) sampai end_index
+  const firstUnpaid = Math.max(h.start_index, currentIndex + 1);
+  const indices: number[] = [];
+  for (let i = firstUnpaid; i <= h.end_index; i++) indices.push(i);
+
+  return {
+    handover_id: h.id,
+    contract_id: h.contract_id,
+    contract_ref: h.credit_contracts.contract_ref,
+    customer_name: h.credit_contracts.customers?.name || "-",
+    collector_id: h.collector_id,
+    collector_name: h.collectors?.name || null,
+    daily_amount: h.credit_contracts.daily_installment_amount,
+    start_index: h.start_index,
+    end_index: h.end_index,
+    current_installment_index: currentIndex,
+    paid_count: paid,
+    unpaid_count: unpaid,
+    unpaid_indices: indices,
+  };
+}
+
 export function DailyDueList() {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  const { data: dueCoupons, isLoading } = useTodayDueCoupons();
+  const { data: handovers, isLoading } = useCouponHandovers();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Group coupons by contract (a single contract may have >1 coupon due same day in edge cases)
-  const groupedByContract = useMemo(() => {
-    const map = new Map<string, {
-      contract_id: string;
-      contract_ref: string;
-      customer_name: string;
-      collector_id: string | null;
-      collector_name: string | null;
-      daily_amount: number;
-      coupons: CouponWithContract[];
-    }>();
-    for (const c of dueCoupons || []) {
-      if (!c.credit_contracts) continue;
-      const key = c.contract_id;
-      const existing = map.get(key);
-      if (existing) {
-        existing.coupons.push(c);
-      } else {
-        map.set(key, {
-          contract_id: c.contract_id,
-          contract_ref: c.credit_contracts.contract_ref,
-          customer_name: c.credit_contracts.customers?.name || "-",
-          collector_id: c.credit_contracts.collector_id,
-          collector_name: c.credit_contracts.collectors?.name || null,
-          daily_amount: c.credit_contracts.daily_installment_amount,
-          coupons: [c],
-        });
-      }
-    }
-    return Array.from(map.values());
-  }, [dueCoupons]);
+  // Build rows dari semua handover yang masih outstanding
+  const rows = useMemo(() => {
+    return (handovers || [])
+      .map(buildRow)
+      .filter((r): r is DueRow => r !== null);
+  }, [handovers]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return groupedByContract;
-    return groupedByContract.filter(
+    if (!q) return rows;
+    return rows.filter(
       (r) =>
         r.customer_name.toLowerCase().includes(q) ||
-        r.contract_ref.toLowerCase().includes(q),
+        r.contract_ref.toLowerCase().includes(q) ||
+        (r.collector_name || "").toLowerCase().includes(q),
     );
-  }, [groupedByContract, searchQuery]);
+  }, [rows, searchQuery]);
 
-  // Selected row for the dialog
-  const [selected, setSelected] = useState<typeof groupedByContract[number] | null>(null);
+  // Dialog state
+  const [selected, setSelected] = useState<DueRow | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
 
-  const openDialog = (row: typeof groupedByContract[number]) => {
+  const openDialog = (row: DueRow) => {
     setSelected(row);
     setReturnedCount(0);
   };
@@ -101,44 +127,45 @@ export function DailyDueList() {
 
   const handleSubmit = async () => {
     if (!selected) return;
-    const total = selected.coupons.length;
+    const total = selected.unpaid_count;
     const returned = Math.max(0, Math.min(returnedCount, total));
     const paidCount = total - returned;
 
-    // Sort coupons by installment_index ascending — pay the earliest ones first;
-    // the LAST `returned` coupons stay unpaid.
-    const sorted = [...selected.coupons].sort(
-      (a, b) => a.installment_index - b.installment_index,
-    );
-    const toPay = sorted.slice(0, paidCount);
+    // Bayar kupon dari index TERAWAL — sisakan `returned` kupon di akhir sebagai outstanding.
+    const toPayIndices = selected.unpaid_indices.slice(0, paidCount);
 
     setSubmitting(true);
     try {
-      if (toPay.length > 0) {
+      if (toPayIndices.length > 0) {
         const today = new Date().toISOString().split("T")[0];
-        // Insert payment_logs for each paid coupon
-        const payments = toPay.map((c) => ({
+
+        // 1) Insert payment_logs
+        const payments = toPayIndices.map((idx) => ({
           contract_id: selected.contract_id,
           payment_date: today,
-          installment_index: c.installment_index,
+          installment_index: idx,
           amount_paid: selected.daily_amount,
           collector_id: selected.collector_id,
-          notes: `Pembayaran harian kupon ${c.installment_index}`,
+          notes: `Pembayaran kupon ${idx} (batch ${selected.start_index}-${selected.end_index})`,
         }));
-
-        const { error: payErr } = await supabase.from("payment_logs").insert(payments);
+        const { error: payErr } = await supabase
+          .from("payment_logs")
+          .insert(payments);
         if (payErr) throw payErr;
 
-        // Mark coupons as paid
-        const paidIds = toPay.map((c) => c.id);
+        // 2) Update installment_coupons -> paid (jika ada record-nya)
         const { error: couponErr } = await supabase
           .from("installment_coupons")
           .update({ status: "paid" })
-          .in("id", paidIds);
-        if (couponErr) throw couponErr;
+          .eq("contract_id", selected.contract_id)
+          .in("installment_index", toPayIndices);
+        if (couponErr) {
+          // non-fatal: tabel coupons mungkin tidak selalu lengkap; lanjut
+          console.warn("update installment_coupons:", couponErr.message);
+        }
 
-        // Update contract.current_installment_index to highest paid index
-        const maxIndex = Math.max(...toPay.map((c) => c.installment_index));
+        // 3) Update credit_contracts.current_installment_index ke index tertinggi yang dibayar
+        const maxIndex = Math.max(...toPayIndices);
         const { error: cErr } = await supabase
           .from("credit_contracts")
           .update({ current_installment_index: maxIndex })
@@ -151,24 +178,26 @@ export function DailyDueList() {
           entity_type: "payment",
           entity_id: null,
           description:
-            `Penagihan harian ${selected.contract_ref} (${selected.customer_name}): ` +
+            `Penagihan ${selected.contract_ref} (${selected.customer_name}) ` +
+            `batch ${selected.start_index}-${selected.end_index}: ` +
             `${paidCount} kupon LUNAS, ${returned} kupon KEMBALI`,
           contract_id: selected.contract_id,
         });
       } else {
-        // All returned — log it but don't insert payments
         logActivity.mutate({
           action: "DAILY_COLLECTION",
           entity_type: "payment",
           entity_id: null,
           description:
-            `Penagihan harian ${selected.contract_ref} (${selected.customer_name}): ` +
+            `Penagihan ${selected.contract_ref} (${selected.customer_name}) ` +
+            `batch ${selected.start_index}-${selected.end_index}: ` +
             `0 kupon LUNAS, ${returned} kupon KEMBALI`,
           contract_id: selected.contract_id,
         });
       }
 
-      // Refresh queries
+      // Refresh semua query terkait — agar tab Belum Bayar ikut sinkron
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
       queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
       queryClient.invalidateQueries({ queryKey: ["payment_logs"] });
       queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
@@ -188,6 +217,13 @@ export function DailyDueList() {
     }
   };
 
+  // Total summary
+  const totalUnpaidCoupons = filteredRows.reduce((s, r) => s + r.unpaid_count, 0);
+  const totalUnpaidAmount = filteredRows.reduce(
+    (s, r) => s + r.unpaid_count * r.daily_amount,
+    0,
+  );
+
   return (
     <>
       <Card>
@@ -197,8 +233,10 @@ export function DailyDueList() {
             Daftar Penagihan Hari Ini
           </CardTitle>
           <CardDescription>
-            Pelanggan dengan kupon jatuh tempo hari ini. Klik <strong>Bayar</strong> untuk
-            mencatat hasil tagihan. Pelanggan yang sudah lunas otomatis hilang dari daftar.
+            Daftar pelanggan dengan kupon <strong>keluar</strong> (sudah diserahterimakan ke
+            kolektor) yang masih belum lunas. Sinkron dengan tab <strong>Belum Bayar</strong>.
+            Klik <strong>Bayar</strong> untuk mencatat hasil tagihan; pelanggan yang lunas
+            otomatis hilang dari daftar.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -206,12 +244,17 @@ export function DailyDueList() {
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Cari nama pelanggan atau kode kontrak..."
+              placeholder="Cari pelanggan, kontrak, atau kolektor..."
               className="max-w-md"
             />
-            <Badge variant="secondary" className="text-sm">
-              {filteredRows.length} pelanggan
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-sm">
+                {filteredRows.length} batch
+              </Badge>
+              <Badge variant="outline" className="text-sm">
+                {totalUnpaidCoupons} kupon • {formatRupiah(totalUnpaidAmount)}
+              </Badge>
+            </div>
           </div>
 
           {isLoading ? (
@@ -224,7 +267,7 @@ export function DailyDueList() {
               <AlertDescription>
                 {searchQuery
                   ? "Tidak ada pelanggan yang cocok dengan pencarian."
-                  : "Semua pelanggan sudah lunas untuk hari ini. 🎉"}
+                  : "Semua kupon yang sudah diserahterimakan sudah lunas. 🎉"}
               </AlertDescription>
             </Alert>
           ) : (
@@ -235,14 +278,15 @@ export function DailyDueList() {
                     <TableHead>Kode Kontrak</TableHead>
                     <TableHead>Pelanggan</TableHead>
                     <TableHead>Kolektor</TableHead>
-                    <TableHead className="text-center">Kupon Hari Ini</TableHead>
+                    <TableHead className="text-center">Range Kupon</TableHead>
+                    <TableHead className="text-center">Outstanding</TableHead>
                     <TableHead className="text-right">Total Tagihan</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredRows.map((row) => (
-                    <TableRow key={row.contract_id}>
+                    <TableRow key={row.handover_id}>
                       <TableCell className="font-mono text-sm">
                         {row.contract_ref}
                       </TableCell>
@@ -251,10 +295,17 @@ export function DailyDueList() {
                         {row.collector_name || "-"}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline">{row.coupons.length}</Badge>
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {row.start_index}-{row.end_index}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="text-destructive border-destructive/40">
+                          {row.unpaid_count} kupon
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {formatRupiah(row.daily_amount * row.coupons.length)}
+                        {formatRupiah(row.daily_amount * row.unpaid_count)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -284,7 +335,8 @@ export function DailyDueList() {
               Catat Penagihan
             </DialogTitle>
             <DialogDescription>
-              {selected?.customer_name} • {selected?.contract_ref}
+              {selected?.customer_name} • {selected?.contract_ref} • Batch{" "}
+              {selected?.start_index}-{selected?.end_index}
             </DialogDescription>
           </DialogHeader>
 
@@ -292,8 +344,8 @@ export function DailyDueList() {
             <div className="space-y-4">
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Kupon hari ini:</span>
-                  <span className="font-semibold">{selected.coupons.length} kupon</span>
+                  <span className="text-muted-foreground">Kupon outstanding:</span>
+                  <span className="font-semibold">{selected.unpaid_count} kupon</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Nominal per kupon:</span>
@@ -302,7 +354,7 @@ export function DailyDueList() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total tagihan:</span>
                   <span className="font-bold text-primary">
-                    {formatRupiah(selected.daily_amount * selected.coupons.length)}
+                    {formatRupiah(selected.daily_amount * selected.unpaid_count)}
                   </span>
                 </div>
               </div>
@@ -315,14 +367,14 @@ export function DailyDueList() {
                   id="returned-count"
                   type="number"
                   min={0}
-                  max={selected.coupons.length}
+                  max={selected.unpaid_count}
                   value={returnedCount}
                   onChange={(e) =>
                     setReturnedCount(
                       Math.max(
                         0,
                         Math.min(
-                          selected.coupons.length,
+                          selected.unpaid_count,
                           parseInt(e.target.value) || 0,
                         ),
                       ),
@@ -331,8 +383,8 @@ export function DailyDueList() {
                   className="text-center font-semibold text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Default <strong>0</strong> = semua kupon dianggap LUNAS. Isi sesuai
-                  jumlah kupon yang dikembalikan kolektor (tidak berhasil ditagih).
+                  Default <strong>0</strong> = semua kupon outstanding dianggap LUNAS. Isi
+                  sesuai jumlah kupon yang dikembalikan kolektor (gagal tagih).
                 </p>
               </div>
 
@@ -352,10 +404,10 @@ export function DailyDueList() {
                   <div className="flex justify-between">
                     <span>Lunas:</span>
                     <span className="font-semibold">
-                      {selected.coupons.length - returnedCount} kupon (
+                      {selected.unpaid_count - returnedCount} kupon (
                       {formatRupiah(
                         selected.daily_amount *
-                          (selected.coupons.length - returnedCount),
+                          (selected.unpaid_count - returnedCount),
                       )}
                       )
                     </span>
