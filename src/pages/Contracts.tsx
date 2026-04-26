@@ -1383,6 +1383,32 @@ export default function Contracts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Return Confirmation */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return Kontrak?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kontrak <b>{selectedContract?.contract_ref}</b> akan ditandai <b>Macet (Return)</b>.
+              <br /><br />
+              Dampak:
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                <li>Data kontrak <b>tetap tersimpan</b> sebagai riwayat.</li>
+                <li>Sisa tagihan (kupon belum bayar) <b>dibatalkan</b> — outstanding berkurang.</li>
+                <li>Omset, modal & komisi sales dari kontrak ini <b>tidak lagi dihitung</b>.</li>
+                <li>Komisi yang sudah dibayar ke sales <b>tidak ditarik kembali</b>.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReturn} className="bg-destructive hover:bg-destructive/90">
+              Ya, Return Kontrak
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
