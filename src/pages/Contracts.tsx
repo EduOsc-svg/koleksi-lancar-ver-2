@@ -1078,15 +1078,18 @@ export default function Contracts() {
                   </div>
                 </div>
                   <div>
-                    <Label htmlFor="keuntungan">Keuntungan (opsional)</Label>
+                    <Label htmlFor="keuntungan">Keuntungan Harian (opsional)</Label>
                     <CurrencyInput
                       id="keuntungan"
                       value={formData.keuntungan}
                       onValueChange={(val) => setFormData({ ...formData, keuntungan: val || 0 })}
-                      placeholder="Rp 0"
+                      placeholder="Rp 0 / hari"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Jika tidak diisi, keuntungan akan dihitung otomatis dari Omset - Modal Efektif
+                      Diinput per hari. Total keuntungan = {formatRupiah((formData.keuntungan || 0) * (parseInt(formData.tenor_days) || 0))} ({formData.tenor_days || 0} hari)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Jika kosong, keuntungan dihitung otomatis dari Omset − Modal Efektif.
                     </p>
                   </div>
             </div>
