@@ -335,26 +335,34 @@ export default function CustomerHistory() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Progress Pinjaman</CardTitle>
+              <CardTitle>Detail Kontrak</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                {/* Pelanggan & Kontrak Ref */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Kontrak</p>
-                    <p className="font-medium">{selectedContract.contract_ref}</p>
+                    <p className="text-sm text-muted-foreground">Pelanggan</p>
+                    <p className="font-medium">{selectedCustomer?.name || "-"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Kontrak: {selectedContract.contract_ref}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total Pinjaman</p>
+                  <div className="sm:text-right">
+                    <p className="text-sm text-muted-foreground">Jumlah Pinjaman</p>
                     <p className="font-medium">{formatRupiah(selectedContract.total_loan_amount)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Cicilan harian: {formatRupiah(selectedContract.daily_installment_amount)}
+                    </p>
                   </div>
                 </div>
 
+                {/* Cicilan yang dibayar - Progress */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Progress</span>
+                    <span>Cicilan Dibayar</span>
                     <span className="font-medium">
-                      {selectedContract.current_installment_index} / {selectedContract.tenor_days} terbayar
+                      {selectedContract.current_installment_index} / {selectedContract.tenor_days} kupon
                     </span>
                   </div>
                   <Progress value={progress} className="h-4" />
@@ -368,7 +376,28 @@ export default function CustomerHistory() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                {/* Tanggal Jatuh Tempo */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tanggal Jatuh Tempo Berikutnya</p>
+                    <p className="font-medium">
+                      {nextDueDate ? formatDate(nextDueDate) : "—"}
+                    </p>
+                    {nextDueCoupon && (
+                      <p className="text-xs text-muted-foreground">
+                        Kupon ke-{nextDueCoupon.installment_index}
+                      </p>
+                    )}
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-sm text-muted-foreground">Catatan Keterlambatan</p>
+                    <p className={`font-medium text-sm ${overdueCount > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                      {lateNote}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t">
                   {selectedContractDynamicStatus && (
                     <Badge className={getStatusBadgeClass(selectedContractDynamicStatus)}>
                       {getStatusLabel(selectedContractDynamicStatus)}
