@@ -816,7 +816,13 @@ export default function Contracts() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(contract)} title="Lihat Detail">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)} title="Edit">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(contract)}
+                        disabled={hasTransactions(contract)}
+                        title={hasTransactions(contract) ? "Tidak dapat diedit: kontrak sudah memiliki transaksi" : "Edit"}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       {contract.status !== "returned" && (
