@@ -64,8 +64,11 @@ export const useTodayDueCoupons = () => {
             daily_installment_amount,
             tenor_days,
             sales_agent_id,
+            collector_id,
+            current_installment_index,
             customers(name, address, phone),
-            sales_agents(name, agent_code)
+            sales_agents(name, agent_code),
+            collectors(name, collector_code)
           )
         `)
         .eq('due_date', today)
