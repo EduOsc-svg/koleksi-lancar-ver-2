@@ -807,12 +807,26 @@ export default function Contracts() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(contract)} title="Lihat Detail">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      {contract.status !== "returned" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Return Kontrak (tandai Macet)"
+                          onClick={() => {
+                            setSelectedContract(contract);
+                            setReturnDialogOpen(true);
+                          }}
+                        >
+                          <Undo2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Hapus"
                         onClick={() => {
                           setSelectedContract(contract);
                           setDeleteDialogOpen(true);
