@@ -262,7 +262,16 @@ export default function Contracts() {
     setDialogOpen(true);
   };
 
+  // Kontrak hanya bisa diedit jika belum ada transaksi (belum ada cicilan terbayar)
+  const hasTransactions = (contract: ContractWithCustomer) => {
+    return (contract.current_installment_index || 0) > 0;
+  };
+
   const handleOpenEdit = (contract: ContractWithCustomer) => {
+    if (hasTransactions(contract)) {
+      toast.error("Kontrak tidak dapat diedit karena sudah ada transaksi pembayaran");
+      return;
+    }
     setSelectedContract(contract);
     setFormData({
       contract_ref: contract.contract_ref,
@@ -807,7 +816,13 @@ export default function Contracts() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(contract)} title="Lihat Detail">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(contract)} title="Edit">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(contract)}
+                        disabled={hasTransactions(contract)}
+                        title={hasTransactions(contract) ? "Tidak dapat diedit: kontrak sudah memiliki transaksi" : "Edit"}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       {contract.status !== "returned" && (
