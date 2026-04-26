@@ -11,7 +11,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useCreateCouponHandover, useCouponHandovers } from "@/hooks/useCouponHandovers";
 import { ManifestFilters } from "@/components/collection/ManifestFilters";
 import { ManifestTable } from "@/components/collection/ManifestTable";
-import { PaymentForm } from "@/components/collection/PaymentForm";
+import { DailyDueList } from "@/components/collection/DailyDueList";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePaymentsByContract } from "@/hooks/usePayments";
