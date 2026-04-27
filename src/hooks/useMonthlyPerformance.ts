@@ -12,15 +12,18 @@ export interface MonthlyPerformanceData {
   total_modal: number;       // CONTRACT BASIS — full nilai modal kontrak yg dibuat di bulan ini
   total_contracts: number;
   total_commission: number;
-          { data: agents, error: agentsError },
-          { data: contracts, error: contractsError },
-          { data: paymentsThisMonth, error: paymentsError },
-          { data: allPayments, error: allPaymentsError },
-          { data: tiersData, error: tiersError },
+  total_collected: number;
+  total_to_collect: number;
+  profit: number;
+  profit_margin: number;
+}
+
+export interface MonthlyPerformanceSummary {
+  total_modal: number;
   total_omset: number;
   total_profit: number;
-  total_collected?: number;
-  total_to_collect?: number;
+  total_collected: number;
+  total_to_collect: number;
   total_commission: number;
   profit_margin: number;
   agents: MonthlyPerformanceData[];
@@ -78,11 +81,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
       if (paymentsError) throw paymentsError;
-<<<<<<< HEAD
-      if (couponsError) throw couponsError;
-=======
       if (allPaymentsError) throw allPaymentsError;
->>>>>>> b3455c3 (Update Corrupt)
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
