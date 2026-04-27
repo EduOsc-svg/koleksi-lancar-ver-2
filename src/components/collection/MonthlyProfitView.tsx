@@ -429,7 +429,7 @@ export function MonthlyProfitView() {
                       {daily.coupons > 0 && (
                         <>
                           <div className="text-xs font-medium text-primary mt-1">
-                            {formatRupiah(daily.profit, false)}
+                            {formatRupiah(daily.profit)}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {daily.coupons} kupon
@@ -470,16 +470,16 @@ export function MonthlyProfitView() {
                 </div>
                 <div className="rounded-lg bg-muted p-3">
                   <div className="text-xs text-muted-foreground">Tertagih</div>
-                  <div className="text-sm font-bold">{formatRupiah(selectedDay.collected, false)}</div>
+                  <div className="text-sm font-bold">{formatRupiah(selectedDay.collected)}</div>
                 </div>
                 <div className="rounded-lg bg-muted p-3">
                   <div className="text-xs text-muted-foreground">Modal</div>
-                  <div className="text-sm font-bold">{formatRupiah(selectedDay.modal, false)}</div>
+                  <div className="text-sm font-bold">{formatRupiah(selectedDay.modal)}</div>
                 </div>
                 <div className="rounded-lg bg-green-100 p-3">
                   <div className="text-xs text-muted-foreground">Profit</div>
                   <div className="text-lg font-bold text-green-600">
-                    {formatRupiah(selectedDay.profit, false)}
+                    {formatRupiah(selectedDay.profit)}
                   </div>
                 </div>
               </div>
@@ -505,10 +505,10 @@ export function MonthlyProfitView() {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-muted-foreground">
-                            {formatRupiah(contract.amount, false)}
+                            {formatRupiah(contract.amount)}
                           </div>
                           <div className="text-sm font-semibold text-green-600 mt-1">
-                            {formatRupiah(contract.profit, false)}
+                            {formatRupiah(contract.profit)}
                           </div>
                         </div>
                       </div>
