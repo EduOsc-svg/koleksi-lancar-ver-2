@@ -23,6 +23,7 @@ export interface MonthlyPerformanceSummary {
   total_omset: number;
   total_profit: number;
   total_collected?: number;
+  total_to_collect?: number;
   total_commission: number;
   profit_margin: number;
   agents: MonthlyPerformanceData[];
@@ -39,6 +40,11 @@ export interface YearlyTargetData {
  * Omset/Modal/Profit diakui PENUH untuk setiap kontrak yang start_date nya di bulan ini.
  * total_collected = uang masuk AKTUAL di bulan ini (cash) — info pelengkap.
  * Komisi: tier diterapkan ke total omset (full kontrak) per agen di bulan ini.
+ * 
+ * SISA TAGIHAN (total_to_collect):
+ * - Dihitung PER KONTRAK dari kontrak yang dibuat bulan ini
+ * - Per kontrak: Sisa Tagihan = Total Nilai Kontrak (total_loan_amount) - Total Pembayaran (ALL TIME)
+ * - Agregat: Sum dari sisa tagihan semua kontrak bulan itu yang masih memiliki sisa
  */
 export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
@@ -51,6 +57,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         { data: agents, error: agentsError },
         { data: contracts, error: contractsError },
         { data: paymentsThisMonth, error: paymentsError },
+        { data: unpaidCoupons, error: couponsError },
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
@@ -65,12 +72,19 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
           .select('amount_paid, payment_date, contract_id')
           .gte('payment_date', monthStart)
           .lte('payment_date', monthEnd),
+        supabase
+          .from('installment_coupons')
+          .select('amount, due_date')
+          .eq('status', 'unpaid')
+          .gte('due_date', monthStart)
+          .lte('due_date', monthEnd),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
       if (paymentsError) throw paymentsError;
+      if (couponsError) throw couponsError;
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
@@ -119,6 +133,28 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + Number(p.amount_paid || 0));
       });
 
+      // Aggregate payments per contract (ALL TIME)
+      const paymentsByContract = new Map<string, number>();
+      const { data: allPayments, error: allPaymentsError } = await supabase
+        .from('payment_logs')
+        .select('amount_paid, contract_id');
+      if (allPaymentsError) throw allPaymentsError;
+      (allPayments || []).forEach((p: any) => {
+        const contractId = p.contract_id;
+        paymentsByContract.set(contractId, (paymentsByContract.get(contractId) || 0) + Number(p.amount_paid || 0));
+      });
+
+      // Hitung sisa tagihan per kontrak: total_loan_amount - total_paid (ALL TIME)
+      let monthlyTotalToCollect = 0;
+      (contracts || []).forEach((c: any) => {
+        const contractValue = Number(c.total_loan_amount || 0);
+        const alreadyPaid = paymentsByContract.get(c.id) || 0;
+        const remaining = contractValue - alreadyPaid;
+        if (remaining > 0) {
+          monthlyTotalToCollect += remaining;
+        }
+      });
+
       const agentResults: MonthlyPerformanceData[] = (agents || []).map((agent) => {
         const data = agentDataMap.get(agent.id);
         const total_omset = data?.total_omset || 0;
@@ -152,6 +188,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
       const total_collected = agentResults.reduce((s, a) => s + a.total_collected, 0);
+      const total_to_collect = monthlyTotalToCollect;
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {
@@ -160,6 +197,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         total_profit,
         total_commission,
         total_collected,
+        total_to_collect,
         profit_margin,
         agents: agentResults.sort((a, b) => b.profit - a.profit),
       };

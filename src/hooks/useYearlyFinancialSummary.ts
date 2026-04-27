@@ -97,7 +97,13 @@ const calculateContractStatus = (contract: {
  * Modal/Omset/Profit bulanan & tahunan dihitung dari NILAI PENUH kontrak,
  * dialokasikan ke bulan berdasarkan start_date kontrak.
  * Komisi: tier per total omset agen sepanjang tahun (full nilai kontrak).
- * total_collected & total_to_collect tetap dari realisasi (info pelengkap).
+ * 
+ * SISA TAGIHAN (total_to_collect):
+ * - Dihitung PER KONTRAK dari tahun terpilih
+ * - Per kontrak: Sisa Tagihan = Total Nilai Kontrak (total_loan_amount) - Total Pembayaran (ALL TIME)
+ * - Agregat: Sum dari sisa tagihan semua kontrak tahun itu yang masih memiliki sisa
+ * 
+ * total_collected: Uang yang tertagih tahun ini (cash).
  */
 export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter: ContractStatusFilter = 'all') => {
   const yearStart = format(startOfYear(year), 'yyyy-MM-dd');
@@ -297,8 +303,34 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
       });
 
+      // Aggregate payments per contract (untuk ALL TIME, bukan hanya tahun ini)
+      const paymentsByContract = new Map<string, number>();
+      const { data: allPayments, error: allPaymentsError } = await supabase
+        .from('payment_logs')
+        .select('amount_paid, contract_id');
+      if (allPaymentsError) throw allPaymentsError;
+      (allPayments || []).forEach((p: any) => {
+        const contractId = p.contract_id;
+        paymentsByContract.set(contractId, (paymentsByContract.get(contractId) || 0) + Number(p.amount_paid || 0));
+      });
+
+      // Hitung sisa tagihan per kontrak: total_loan_amount - total_paid (dari kontrak tahun ini)
+      let totalToCollect = 0;
+      const contractsYearList = (contracts || []).filter((c: any) => {
+        if (!c.start_date) return false;
+        const startYear = new Date(c.start_date).getFullYear();
+        return startYear === selectedYear;
+      });
+      contractsYearList.forEach((c: any) => {
+        const contractValue = Number(c.total_loan_amount || 0);
+        const alreadyPaid = paymentsByContract.get(c.id) || 0;
+        const remaining = contractValue - alreadyPaid;
+        if (remaining > 0) {
+          totalToCollect += remaining;
+        }
+      });
+
       const totalProfit = totalOmset - totalModal;
-      const totalToCollect = (unpaidCoupons || []).reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
       const netProfit = totalProfit - totalCommission - totalExpenses;
       const netProfitPct = totalOmset > 0 ? (netProfit / totalOmset) * 100 : 0;
       const profitMargin = totalModal > 0 ? (totalProfit / totalModal) * 100 : 0;

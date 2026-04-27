@@ -20,7 +20,7 @@ import {
   Bar,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt } from "lucide-react";
 import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -272,6 +272,16 @@ export default function Dashboard() {
           valueColor="text-teal-600"
           subtitle="Pembayaran masuk bulan ini"
           hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak."
+        />
+
+        <StatCard
+          icon={Receipt}
+          iconColor="text-sky-500"
+          label="Sisa Tagihan"
+          value={monthlyData?.total_to_collect ?? 0}
+          valueColor="text-sky-600"
+          subtitle="Belum dibayar bulan ini"
+          hoverInfo={`Sisa tagihan per kontrak bulan ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(monthlyData?.total_to_collect ?? 0)}`}
         />
 
         <StatCard
@@ -602,6 +612,16 @@ export default function Dashboard() {
                   valueColor="text-purple-600"
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_commission ?? 0)} | Dari ${yearlyFinancial?.contracts_count ?? 0} kontrak`}
+                />
+
+                <StatCard
+                  icon={CheckCircle}
+                  iconColor="text-teal-500"
+                  label="Sisa Tagihan"
+                  value={yearlyFinancial?.total_to_collect ?? 0}
+                  valueColor="text-teal-600"
+                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}`}
                 />
 
                 <StatCard
