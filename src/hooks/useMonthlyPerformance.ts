@@ -178,12 +178,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
       const total_collected = agentResults.reduce((s, a) => s + a.total_collected, 0);
-<<<<<<< HEAD
-      const total_to_collect = monthlyTotalToCollect;
-=======
-      // Sisa Tagihan = (daily_installment_amount × tenor_days - paid) dari kontrak bulan ini
       const total_to_collect = totalSisaTagihan;
->>>>>>> b3455c3 (Update Corrupt)
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {
