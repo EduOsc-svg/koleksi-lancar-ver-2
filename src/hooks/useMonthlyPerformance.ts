@@ -12,15 +12,18 @@ export interface MonthlyPerformanceData {
   total_modal: number;       // CONTRACT BASIS — full nilai modal kontrak yg dibuat di bulan ini
   total_contracts: number;
   total_commission: number;
-          { data: agents, error: agentsError },
-          { data: contracts, error: contractsError },
-          { data: paymentsThisMonth, error: paymentsError },
-          { data: allPayments, error: allPaymentsError },
-          { data: tiersData, error: tiersError },
+  total_collected: number;
+  total_to_collect: number;
+  profit: number;
+  profit_margin: number;
+}
+
+export interface MonthlyPerformanceSummary {
+  total_modal: number;
   total_omset: number;
   total_profit: number;
-  total_collected?: number;
-  total_to_collect?: number;
+  total_collected: number;
+  total_to_collect: number;
   total_commission: number;
   profit_margin: number;
   agents: MonthlyPerformanceData[];
@@ -78,11 +81,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
       if (paymentsError) throw paymentsError;
-<<<<<<< HEAD
-      if (couponsError) throw couponsError;
-=======
       if (allPaymentsError) throw allPaymentsError;
->>>>>>> b3455c3 (Update Corrupt)
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
@@ -131,28 +130,6 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + Number(p.amount_paid || 0));
       });
 
-<<<<<<< HEAD
-      // Aggregate payments per contract (ALL TIME)
-      const paymentsByContract = new Map<string, number>();
-      const { data: allPayments, error: allPaymentsError } = await supabase
-        .from('payment_logs')
-        .select('amount_paid, contract_id');
-      if (allPaymentsError) throw allPaymentsError;
-      (allPayments || []).forEach((p: any) => {
-        const contractId = p.contract_id;
-        paymentsByContract.set(contractId, (paymentsByContract.get(contractId) || 0) + Number(p.amount_paid || 0));
-      });
-
-      // Hitung sisa tagihan per kontrak: total_loan_amount - total_paid (ALL TIME)
-      let monthlyTotalToCollect = 0;
-      (contracts || []).forEach((c: any) => {
-        const contractValue = Number(c.total_loan_amount || 0);
-        const alreadyPaid = paymentsByContract.get(c.id) || 0;
-        const remaining = contractValue - alreadyPaid;
-        if (remaining > 0) {
-          monthlyTotalToCollect += remaining;
-        }
-=======
       // Sisa Tagihan = SUM(daily_installment_amount × tenor_days - paid_amount) per kontrak
       // dari kontrak yang dibuat bulan ini
       const paidByContract = new Map<string, number>();
@@ -166,7 +143,6 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         const paidAmount = paidByContract.get(c.id) || 0;
         const sisaKontrak = Math.max(0, contractTotal - paidAmount);
         totalSisaTagihan += sisaKontrak;
->>>>>>> b3455c3 (Update Corrupt)
       });
 
       const agentResults: MonthlyPerformanceData[] = (agents || []).map((agent) => {
@@ -202,12 +178,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
       const total_collected = agentResults.reduce((s, a) => s + a.total_collected, 0);
-<<<<<<< HEAD
-      const total_to_collect = monthlyTotalToCollect;
-=======
-      // Sisa Tagihan = (daily_installment_amount × tenor_days - paid) dari kontrak bulan ini
       const total_to_collect = totalSisaTagihan;
->>>>>>> b3455c3 (Update Corrupt)
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {

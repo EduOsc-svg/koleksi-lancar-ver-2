@@ -274,57 +274,26 @@ export default function Dashboard() {
           hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak."
         />
 
-<<<<<<< HEAD
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Wallet}
-              iconColor="text-red-500"
-              label="Sisa Tagihan"
-              value={monthlyData?.total_to_collect ?? 0}
-              valueColor="text-red-600"
-              subtitle="Kupon belum bayar bulan ini"
-              hoverInfo="Total kupon cicilan yang masih belum dibayar dalam bulan ini (jatuh tempo bulan ini, status unpaid)."
-            />
-          </div>
+        <StatCard
+          icon={Wallet}
+          iconColor="text-red-500"
+          label="Sisa Tagihan"
+          value={monthlyData?.total_to_collect ?? 0}
+          valueColor="text-red-600"
+          subtitle="Kupon belum bayar bulan ini"
+          hoverInfo="Total kupon cicilan yang masih belum dibayar dalam bulan ini (jatuh tempo bulan ini, status unpaid)."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Settings}
-              iconColor="text-orange-500"
-              label="Biaya Operasional"
-              value={totalExpenses}
-              valueColor="text-orange-600"
-              isNegative
-              subtitle="Pengeluaran bulan ini"
-              hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
-            />
-          </div>
-=======
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Wallet}
-              iconColor="text-red-500"
-              label="Sisa Tagihan"
-              value={monthlyData?.total_to_collect ?? 0}
-              valueColor="text-red-600"
-              subtitle="Kupon belum bayar bulan ini"
-              hoverInfo="Total kupon cicilan yang masih belum dibayar dalam bulan ini (jatuh tempo bulan ini, status unpaid)."
-            />
-          </div>
-
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Settings}
-              iconColor="text-orange-500"
-              label="Biaya Operasional"
-              value={totalExpenses}
-              valueColor="text-orange-600"
-              isNegative
-              subtitle="Pengeluaran bulan ini"
-              hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
-            />
-          </div>
->>>>>>> bc2db3b (UpdaTe)
+        <StatCard
+          icon={Settings}
+          iconColor="text-orange-500"
+          label="Biaya Operasional"
+          value={totalExpenses}
+          valueColor="text-orange-600"
+          isNegative
+          subtitle="Pengeluaran bulan ini"
+          hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
+        />
 
         <StatCard
           icon={AlertTriangle}
