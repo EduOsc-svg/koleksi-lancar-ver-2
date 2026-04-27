@@ -127,16 +127,41 @@ export const useDeleteContract = () => {
         .eq('id', id)
         .single();
       
+      // Hapus child rows dulu agar delete tidak gagal karena FK constraint
+      // (payment_logs & coupon_handovers tidak punya ON DELETE CASCADE).
+      const { error: phErr } = await supabase
+        .from('payment_logs')
+        .delete()
+        .eq('contract_id', id);
+      if (phErr) throw new Error(`Gagal hapus riwayat pembayaran: ${phErr.message}`);
+
+      const { error: chErr } = await supabase
+        .from('coupon_handovers')
+        .delete()
+        .eq('contract_id', id);
+      if (chErr) throw new Error(`Gagal hapus riwayat serah terima kupon: ${chErr.message}`);
+
+      // installment_coupons biasanya CASCADE, tapi hapus eksplisit untuk memastikan
+      const { error: icErr } = await supabase
+        .from('installment_coupons')
+        .delete()
+        .eq('contract_id', id);
+      if (icErr) throw new Error(`Gagal hapus kupon: ${icErr.message}`);
+
       const { error } = await supabase
         .from('credit_contracts')
         .delete()
         .eq('id', id);
-      if (error) throw error;
+      if (error) throw new Error(`Gagal hapus kontrak: ${error.message}`);
       return { id, contract_ref: contractData?.contract_ref };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
+      queryClient.invalidateQueries({ queryKey: ['installment_coupons'] });
+      queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
+      queryClient.invalidateQueries({ queryKey: ['coupon_handovers'] });
+      queryClient.invalidateQueries({ queryKey: ['outstanding_coupons'] });
       
       logActivity.mutate({
         action: 'DELETE',
