@@ -566,7 +566,9 @@ export default function Contracts() {
       setDeleteDialogOpen(false);
       setSelectedContract(null);
     } catch (error) {
-      toast.error("Gagal menghapus kontrak");
+      console.error('Delete contract error:', error);
+      const msg = error instanceof Error ? error.message : 'Gagal menghapus kontrak';
+      toast.error(msg);
     }
   };
 
