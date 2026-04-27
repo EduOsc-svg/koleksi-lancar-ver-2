@@ -21,7 +21,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle } from "lucide-react";
-import { useReturnedLoss } from "@/hooks/useReturnedLoss";
+import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -66,6 +66,7 @@ export default function Dashboard() {
   const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
+  const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
