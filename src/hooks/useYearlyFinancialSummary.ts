@@ -116,23 +116,23 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         { data: agents, error: agentsError },
         { data: contracts, error: contractsError },
         { data: payments, error: paymentsError },
+        { data: allPayments, error: allPaymentsError },
         { data: expenses, error: expensesError },
-        { data: unpaidCoupons, error: couponsError },
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
-        supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, customers(name, phone)'),
+        supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)'),
         supabase.from('payment_logs').select('amount_paid, payment_date, contract_id').gte('payment_date', yearStart).lte('payment_date', yearEnd),
+        supabase.from('payment_logs').select('amount_paid, contract_id'),
         supabase.from('operational_expenses').select('amount, expense_date, description, category').gte('expense_date', yearStart).lte('expense_date', yearEnd),
-        supabase.from('installment_coupons').select('amount, due_date, contract_id').eq('status', 'unpaid').gte('due_date', yearStart).lte('due_date', yearEnd),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
       if (paymentsError) throw paymentsError;
+      if (allPaymentsError) throw allPaymentsError;
       if (expensesError) throw expensesError;
-      if (couponsError) throw couponsError;
       if (tiersError) throw tiersError;
 
       const tiers = (tiersData || []) as CommissionTier[];
@@ -303,31 +303,28 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
       });
 
-      // Aggregate payments per contract (untuk ALL TIME, bukan hanya tahun ini)
+      // Aggregate all-time payments per contract
       const paymentsByContract = new Map<string, number>();
       const { data: allPayments, error: allPaymentsError } = await supabase
         .from('payment_logs')
         .select('amount_paid, contract_id');
       if (allPaymentsError) throw allPaymentsError;
       (allPayments || []).forEach((p: any) => {
-        const contractId = p.contract_id;
-        paymentsByContract.set(contractId, (paymentsByContract.get(contractId) || 0) + Number(p.amount_paid || 0));
+        paymentsByContract.set(p.contract_id, (paymentsByContract.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
       });
 
-      // Hitung sisa tagihan per kontrak: total_loan_amount - total_paid (dari kontrak tahun ini)
+      // Compute sisa tagihan per contract using daily_installment_amount * tenor_days - paid (ALL TIME)
       let totalToCollect = 0;
-      const contractsYearList = (contracts || []).filter((c: any) => {
-        if (!c.start_date) return false;
+      (contracts || []).forEach((c: any) => {
+        if (!c.start_date) return;
         const startYear = new Date(c.start_date).getFullYear();
-        return startYear === selectedYear;
-      });
-      contractsYearList.forEach((c: any) => {
-        const contractValue = Number(c.total_loan_amount || 0);
-        const alreadyPaid = paymentsByContract.get(c.id) || 0;
-        const remaining = contractValue - alreadyPaid;
-        if (remaining > 0) {
-          totalToCollect += remaining;
-        }
+        if (startYear !== selectedYear) return;
+        if (c.status === 'returned') return;
+
+        const contractTotal = Number(c.daily_installment_amount || 0) * Number(c.tenor_days || 0);
+        const paidAmount = paymentsByContract.get(c.id) || 0;
+        const sisaKontrak = Math.max(0, contractTotal - paidAmount);
+        totalToCollect += sisaKontrak;
       });
 
       const totalProfit = totalOmset - totalModal;

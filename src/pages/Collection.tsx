@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { FileText, CreditCard, AlertCircle, TrendingUp } from "lucide-react";
+import { FileText, CreditCard, AlertCircle, TrendingUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
 import { useCollectors } from "@/hooks/useCollectors";
 import { useContracts } from "@/hooks/useContracts";
-import { useCreatePayment, useCreateBulkPayment } from "@/hooks/usePayments";
+import { useSalesAgents } from "@/hooks/useSalesAgents";
+import { useCreatePayment, useCreateBulkPayment, usePayments } from "@/hooks/usePayments";
 import { usePagination } from "@/hooks/usePagination";
 import { useCreateCouponHandover, useCouponHandovers } from "@/hooks/useCouponHandovers";
 import { ManifestFilters } from "@/components/collection/ManifestFilters";
@@ -20,10 +21,14 @@ import { OutstandingCouponsTable } from "@/components/collection/OutstandingCoup
 import { HandoverCouponForm } from "@/components/collection/HandoverCouponForm";
 import { addToQueue } from "@/lib/offlineQueue";
 import { notifyQueueUpdated } from "@/hooks/useOfflineQueue";
+import { exportPaymentInputToExcel } from "@/lib/exportPaymentInput";
+import { exportPaymentPerSalesExcel } from "@/lib/exportPaymentPerSales";
 
 export default function Collection() {
   const { data: collectors } = useCollectors();
   const { data: contracts, isLoading: contractsLoading } = useContracts("active");
+  const { data: salesAgents } = useSalesAgents();
+  const { data: payments, isLoading: paymentsLoading } = usePayments();
   const createPayment = useCreatePayment();
   const createBulkPayment = useCreateBulkPayment();
   const createHandover = useCreateCouponHandover();
@@ -209,6 +214,46 @@ export default function Collection() {
         </TabsContent>
 
         <TabsContent value="payment" className="mt-6">
+          <div className="flex justify-end gap-2 mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (!payments || payments.length === 0) {
+                  toast.error("Tidak ada data pembayaran untuk diexport");
+                  return;
+                }
+                try {
+                  exportPaymentPerSalesExcel(payments, contracts || [], salesAgents || []);
+                  toast.success("Export pembayaran per sales berhasil");
+                } catch (error) {
+                  toast.error("Gagal export pembayaran per sales");
+                  console.error(error);
+                }
+              }}
+              disabled={paymentsLoading}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export Per Sales
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (!payments || payments.length === 0) {
+                  toast.error("Tidak ada data pembayaran untuk diexport");
+                  return;
+                }
+                try {
+                  exportPaymentInputToExcel(payments, contracts || []);
+                  toast.success("Export pembayaran berhasil");
+                } catch (error) {
+                  toast.error("Gagal export pembayaran");
+                  console.error(error);
+                }
+              }}
+              disabled={paymentsLoading}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export Excel
+            </Button>
+          </div>
           <DailyDueList />
         </TabsContent>
 

@@ -14,19 +14,19 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const HEADERS = [
-  'No', 'Tanggal', 'Kolektor', 'Kode Sales', 'Kode Kolektor', 'Konsumen', 'Kode Kontrak',
-  'Pembayaran ke', 'Jumlah Kupon', 'Tertagih', 'Belum Tagih', 'Status',
-  'Nominal/Kupon', 'Total Nominal', 'Tertagih (Rp)', 'Sisa (Rp)',
+  'No', 'Kolektor', 'Kode Sales', 'Kode Kolektor', 'Konsumen', 'Kode Kontrak',
+  'Pembayaran ke', 'Jumlah Kupon', 'Status',
+  'Nominal/Kupon', 'Total Nominal', 'Sisa (Rp)',
 ];
 
-const COL_WIDTHS = [5, 14, 20, 14, 14, 22, 15, 16, 10, 10, 12, 14, 16, 18, 18, 18];
+const COL_WIDTHS = [5, 20, 14, 14, 22, 15, 16, 10, 14, 16, 18, 18];
 
 // Per-collector sheet (single collector) — different column layout as requested
 const COLLECTOR_HEADERS = [
-  'No', 'Tanggal', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Jumlah Kupon', 'Tertagih', 'Angsuran', 'Tertagih (Rp)'
+  'No', 'Tanggal', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Jumlah Kupon', 'Angsuran', 'Tertagih (Rp)'
 ];
 
-const COLLECTOR_COL_WIDTHS = [5, 14, 30, 16, 14, 12, 12, 14, 18];
+const COLLECTOR_COL_WIDTHS = [5, 14, 30, 16, 14, 12, 14, 18];
 
 function buildSheet(
   workbook: ExcelJS.Workbook,
@@ -41,7 +41,7 @@ function buildSheet(
   if (isCollectorSheet) {
     sheet.mergeCells('A1:I1');
   } else {
-    sheet.mergeCells('A1:P1');
+    sheet.mergeCells('A1:L1');
   }
   const titleCell = sheet.getCell('A1');
   titleCell.value = title;
@@ -52,7 +52,7 @@ function buildSheet(
   if (isCollectorSheet) {
     sheet.mergeCells('A2:I2');
   } else {
-    sheet.mergeCells('A2:P2');
+    sheet.mergeCells('A2:L2');
   }
   const dateCell = sheet.getCell('A2');
   dateCell.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
@@ -79,7 +79,8 @@ function buildSheet(
 
     let dataRowValues: any[] = [];
     if (isCollectorSheet) {
-      // Per-collector layout: No, Tanggal, Konsumen, Kode Kontrak, Pembayaran Ke, Jumlah Kupon, Tertagih, Angsuran, Tertagih (Rp)
+      // Per-collector layout: No, Tanggal, Konsumen, Kode Kontrak, Pembayaran Ke, Jumlah Kupon, Angsuran, Tertagih (Rp)
+      // Tertagih (Rp) = Jumlah Kupon * Angsuran
       dataRowValues = [
         i + 1,
         h.handover_date,
@@ -87,14 +88,13 @@ function buildSheet(
         h.credit_contracts?.contract_ref || '-',
         `${h.start_index}-${h.end_index}`,
         h.coupon_count,
-        h.paidInRange,
         amt,
-        { formula: `G${rowNum}*H${rowNum}` }, // Tertagih(Rp) = Tertagih * Angsuran
+        { formula: `F${rowNum}*G${rowNum}` }, // Tertagih(Rp) = Jumlah Kupon * Angsuran
       ];
     } else {
+      // Master sheet layout: No, Kolektor, Kode Sales, Kode Kolektor, Konsumen, Kode Kontrak, Pembayaran ke, Jumlah Kupon, Status, Nominal/Kupon, Total Nominal, Sisa (Rp)
       dataRowValues = [
         i + 1,
-        h.handover_date,
         h.collectors?.name || '-',
         h.credit_contracts?.sales_agents?.agent_code || '-',
         h.collectors?.collector_code || '-',
@@ -102,13 +102,10 @@ function buildSheet(
         h.credit_contracts?.contract_ref || '-',
         `${h.start_index}-${h.end_index}`,
         h.coupon_count,
-        h.paidInRange,
-        h.unpaidInRange,
         STATUS_LABELS[h.status] || h.status,
         amt,
-        { formula: `I${rowNum}*M${rowNum}` },
-        { formula: `J${rowNum}*M${rowNum}` },
-        { formula: `K${rowNum}*M${rowNum}` },
+        { formula: `H${rowNum}*J${rowNum}` },
+        { formula: `K${rowNum}*L${rowNum}` },
       ];
     }
 
@@ -118,24 +115,25 @@ function buildSheet(
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
       if (isCollectorSheet) {
-        // Collector sheet formatting: columns 6 and 7 numeric, 8 and 9 currency
-        if ([6, 7].includes(colNumber)) {
+        // Collector sheet formatting: columns 6 numeric, 7 and 8 currency
+        if ([6].includes(colNumber)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
-        } else if ([8, 9].includes(colNumber)) {
+        } else if ([7, 8].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
         }
       } else {
-        if ([13, 14, 15, 16].includes(colNumber)) {
+        // Master sheet formatting
+        if ([10, 11, 12].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
-        } else if ([9, 10, 11].includes(colNumber)) {
+        } else if ([8].includes(colNumber)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
         }
 
-        if (colNumber === 12) {
+        if (colNumber === 9) {
           cell.alignment = { horizontal: 'center' };
           if (h.status === 'fully_paid') {
             cell.font = { bold: true, color: { argb: 'FF228B22' } };
@@ -161,20 +159,18 @@ function buildSheet(
       totalRowValues = [
         '', '', 'TOTAL', '', '',
         { formula: `SUM(F${startRow}:F${endRow})` },
-        { formula: `SUM(G${startRow}:G${endRow})` },
         '',
-        { formula: `SUM(I${startRow}:I${endRow})` },
+        { formula: `SUM(H${startRow}:H${endRow})` },
       ];
     } else {
+      // Master sheet: total jumlah kupon (H), total nominal (K), total sisa (L)
       totalRowValues = [
-        '', '', '', '', '', '', 'TOTAL', '',
-        { formula: `SUM(I${startRow}:I${endRow})` },
-        { formula: `SUM(J${startRow}:J${endRow})` },
+        '', '', '', '', '', 'TOTAL', '',
+        { formula: `SUM(H${startRow}:H${endRow})` },
+        '',
+        '',
         { formula: `SUM(K${startRow}:K${endRow})` },
-        '', '',
-        { formula: `SUM(N${startRow}:N${endRow})` },
-        { formula: `SUM(O${startRow}:O${endRow})` },
-        { formula: `SUM(P${startRow}:P${endRow})` },
+        { formula: `SUM(L${startRow}:L${endRow})` },
       ];
     }
 
@@ -185,18 +181,18 @@ function buildSheet(
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
       cell.border = { top: { style: 'double' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
       if (isCollectorSheet) {
-        if ([6, 7].includes(colNumber)) {
+        if ([6].includes(colNumber)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
-        } else if ([8, 9].includes(colNumber)) {
+        } else if ([7, 8].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
         }
       } else {
-        if ([13, 14, 15, 16].includes(colNumber)) {
+        if ([10, 11, 12].includes(colNumber)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
-        } else if ([9, 10, 11].includes(colNumber)) {
+        } else if ([8].includes(colNumber)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
         }
