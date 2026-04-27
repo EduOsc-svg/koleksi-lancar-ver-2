@@ -305,10 +305,6 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
 
       // Aggregate all-time payments per contract
       const paymentsByContract = new Map<string, number>();
-      const { data: allPayments, error: allPaymentsError } = await supabase
-        .from('payment_logs')
-        .select('amount_paid, contract_id');
-      if (allPaymentsError) throw allPaymentsError;
       (allPayments || []).forEach((p: any) => {
         paymentsByContract.set(p.contract_id, (paymentsByContract.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
       });
