@@ -454,7 +454,6 @@ export default function Contracts() {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
       const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
-      const totalKeuntungan = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
 
       // Paksa status active agar kupon dibuat & bisa langsung dicetak
       const statusForPrint = "active";
@@ -471,7 +470,6 @@ export default function Contracts() {
         start_date: formData.start_date,
         status: statusForPrint,
         omset: modalEfektif,
-        keuntungan: totalKeuntungan,
       } as any);
 
       if (!newContract?.id) {

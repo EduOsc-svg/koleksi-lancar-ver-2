@@ -21,7 +21,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle } from "lucide-react";
-import { useReturnedLoss } from "@/hooks/useReturnedLoss";
+import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -66,6 +66,7 @@ export default function Dashboard() {
   const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
+  const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
@@ -612,6 +613,17 @@ export default function Dashboard() {
                   isNegative
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_expenses ?? 0)} | Biaya operasional tahun ${selectedYear.getFullYear()}`}
+                />
+
+                <StatCard
+                  icon={AlertTriangle}
+                  iconColor="text-destructive"
+                  label="Kerugian Return/Macet"
+                  value={returnedLossYearly?.total_loss ?? 0}
+                  valueColor="text-destructive"
+                  isNegative
+                  subtitle={`${returnedLossYearly?.returned_count ?? 0} kontrak return tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
                 />
 
               </div>
