@@ -20,7 +20,8 @@ import {
   Bar,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign } from "lucide-react";
+import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { useReturnedLoss } from "@/hooks/useReturnedLoss";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
