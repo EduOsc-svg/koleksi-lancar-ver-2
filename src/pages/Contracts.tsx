@@ -437,12 +437,27 @@ export default function Contracts() {
       toast.error("Pilih kolektor terlebih dahulu");
       return;
     }
+    if (!formData.total_loan_amount || formData.total_loan_amount <= 0) {
+      toast.error("Total pinjaman harus diisi dan lebih dari 0");
+      return;
+    }
+    if (!formData.tenor_days || parseInt(formData.tenor_days) <= 0) {
+      toast.error("Tenor harus diisi dan lebih dari 0");
+      return;
+    }
+    if (!formData.modal || formData.modal <= 0) {
+      toast.error("Modal awal harus diisi dan lebih dari 0");
+      return;
+    }
 
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
       const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
       const totalKeuntungan = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
+
+      // Paksa status active agar kupon dibuat & bisa langsung dicetak
+      const statusForPrint = "active";
 
       const { data: newContract } = await createContract.mutateAsync({
         contract_ref: formData.contract_ref,
@@ -454,107 +469,81 @@ export default function Contracts() {
         tenor_days: tenorDays,
         daily_installment_amount: dailyAmount,
         start_date: formData.start_date,
-        status: formData.status,
-        omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+        status: statusForPrint,
+        omset: modalEfektif,
         keuntungan: totalKeuntungan,
       } as any);
 
-      // Generate installment coupons for new active contracts
-      if (formData.status === "active" && newContract?.id) {
-        await generateCoupons.mutateAsync({
-          contractId: newContract.id,
-          startDate: formData.start_date,
-          tenorDays: tenorDays,
-          dailyAmount: dailyAmount,
-        });
-        toast.success(`Kontrak dibuat dengan ${tenorDays} kupon`);
-
-        console.log('create+generate: newContract ->', newContract);
-
-          // Try to ensure coupons exist before triggering print.
-          // We'll poll the installment_coupons table a few times and wait briefly.
-          let couponsAvailable: any[] = [];
-          try {
-            const maxAttempts = 6;
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-              const { data: couponsData, error: fetchError } = await supabase
-                .from('installment_coupons')
-                .select('*')
-                .eq('contract_id', newContract.id)
-                .order('installment_index', { ascending: true });
-
-              if (fetchError) {
-                console.error('Error fetching coupons after generate:', fetchError);
-                break;
-              }
-
-              console.log(`Polling attempt ${attempt + 1}/${maxAttempts} for contract ${newContract.id}: found ${Array.isArray(couponsData) ? (couponsData as any[]).length : 0} coupons`);
-
-              if (couponsData && (couponsData as any[]).length > 0) {
-                couponsAvailable = couponsData as any[];
-                break;
-              }
-
-              // wait 500ms before next attempt
-              await new Promise((res) => setTimeout(res, 500));
-            }
-          } catch (e) {
-            console.error('Polling for coupons failed', e);
-          }
-
-          // Fetch full contract with related customer/sales/collector so print has names & addresses
-          let fullContract: ContractWithCustomer | null = null;
-          try {
-            const { data: contractFullData, error: contractFetchError } = await supabase
-              .from('credit_contracts')
-              .select('*, customers(name, address, business_address, phone), sales_agents(name, agent_code), collectors(name, collector_code)')
-              .eq('id', newContract.id)
-              .single();
-            if (contractFetchError) {
-              console.error('Failed to fetch full contract for printing:', contractFetchError);
-            } else {
-              fullContract = contractFullData as ContractWithCustomer;
-            }
-          } catch (e) {
-            console.error('Error fetching full contract for printing', e);
-          }
-
-          // Close modal and set selected contract so print component can load coupons
-          setDialogOpen(false);
-          setSelectedContract((fullContract || newContract) as ContractWithCustomer);
-
-          if (couponsAvailable.length === 0) {
-            // If coupons still not available, inform the user but still keep contract selected.
-            toast.warning('Kupon belum tersedia untuk dicetak. Coba cetak manual setelah beberapa saat.');
-            // Also invalidate queries to ensure hook will refetch when user opens detail
-            try { queryClient.invalidateQueries({ queryKey: ['installment_coupons', 'contract', newContract.id] }); } catch (e) { /* noop */ }
-            return;
-          }
-
-          // Prime React Query cache for the coupons so useCouponsByContract sees them immediately
-          try {
-            queryClient.setQueryData(['installment_coupons', 'contract', newContract.id], couponsAvailable);
-          } catch (e) {
-            console.error('Failed to set query data for coupons:', e);
-          }
-
-          console.log('Coupons available after generate:', couponsAvailable.length, couponsAvailable?.slice?.(0,3));
-
-          // Coupons are available — trigger print flow using enriched contract if available
-          try {
-            // Use direct print helper with the coupons we fetched to avoid race with hook state
-            doPrint(couponsAvailable, (fullContract || newContract) as ContractWithCustomer);
-          } catch (e) {
-            console.error('Print trigger failed', e);
-          }
-          return;
+      if (!newContract?.id) {
+        toast.error("Kontrak tidak berhasil dibuat");
+        return;
       }
 
-      toast.success("Kontrak berhasil dibuat");
+      // Generate kupon
+      await generateCoupons.mutateAsync({
+        contractId: newContract.id,
+        startDate: formData.start_date,
+        tenorDays: tenorDays,
+        dailyAmount: dailyAmount,
+      });
+      toast.success(`Kontrak dibuat dengan ${tenorDays} kupon`);
+
+      // Poll sampai kupon tersedia
+      let couponsAvailable: any[] = [];
+      const maxAttempts = 6;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const { data: couponsData, error: fetchError } = await supabase
+          .from('installment_coupons')
+          .select('*')
+          .eq('contract_id', newContract.id)
+          .order('installment_index', { ascending: true });
+
+        if (fetchError) {
+          console.error('Error fetching coupons after generate:', fetchError);
+          break;
+        }
+        if (couponsData && (couponsData as any[]).length > 0) {
+          couponsAvailable = couponsData as any[];
+          break;
+        }
+        await new Promise((res) => setTimeout(res, 500));
+      }
+
+      // Fetch full contract dengan relasi (customer/sales/collector) untuk print
+      let fullContract: ContractWithCustomer | null = null;
+      const { data: contractFullData, error: contractFetchError } = await supabase
+        .from('credit_contracts')
+        .select('*, customers(name, address, business_address, phone), sales_agents(name, agent_code), collectors(name, collector_code)')
+        .eq('id', newContract.id)
+        .single();
+      if (contractFetchError) {
+        console.error('Failed to fetch full contract for printing:', contractFetchError);
+      } else {
+        fullContract = contractFullData as ContractWithCustomer;
+      }
+
       setDialogOpen(false);
+      setSelectedContract((fullContract || newContract) as ContractWithCustomer);
+
+      if (couponsAvailable.length === 0) {
+        toast.warning('Kupon belum tersedia untuk dicetak. Buka detail kontrak lalu cetak manual.');
+        try { queryClient.invalidateQueries({ queryKey: ['installment_coupons', 'contract', newContract.id] }); } catch (e) { /* noop */ }
+        return;
+      }
+
+      // Prime cache supaya hook melihat kupon baru segera
+      try {
+        queryClient.setQueryData(['installment_coupons', 'contract', newContract.id], couponsAvailable);
+      } catch (e) {
+        console.error('Failed to set query data for coupons:', e);
+      }
+
+      // Trigger print
+      doPrint(couponsAvailable, (fullContract || newContract) as ContractWithCustomer);
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal menyimpan data");
+      console.error('handleCreateAndPrint error:', error);
+      const msg = error instanceof Error ? error.message : 'Gagal membuat kontrak / mencetak kupon';
+      toast.error(msg);
     }
   };
 
@@ -566,7 +555,9 @@ export default function Contracts() {
       setDeleteDialogOpen(false);
       setSelectedContract(null);
     } catch (error) {
-      toast.error("Gagal menghapus kontrak");
+      console.error('Delete contract error:', error);
+      const msg = error instanceof Error ? error.message : 'Gagal menghapus kontrak';
+      toast.error(msg);
     }
   };
 

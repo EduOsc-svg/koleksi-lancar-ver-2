@@ -20,7 +20,8 @@ import {
   Bar,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign } from "lucide-react";
+import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { useReturnedLoss } from "@/hooks/useReturnedLoss";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -64,6 +65,7 @@ export default function Dashboard() {
   const { data: yearlyFinancial, isLoading: isLoadingYearlyFinancial } = useYearlyFinancialSummary(selectedYear);
   const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
+  const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
@@ -210,96 +212,89 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Monthly Summary Cards - Horizontal Scrollable */}
-      <ScrollArea className="w-full">
-        <div className="flex gap-4 pb-4" style={{ minWidth: 'max-content' }}>
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={DollarSign}
-              iconColor="text-blue-500"
-              label="Total Modal"
-              value={contractTotals.total_modal}
-              subtitle="Kontrak baru bulan ini"
-              hoverInfo="Total modal (harga pokok) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
-            />
-          </div>
+      {/* Monthly Summary Cards - Grid 4 kolom × 2 baris */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={DollarSign}
+          iconColor="text-blue-500"
+          label="Total Modal"
+          value={contractTotals.total_modal}
+          subtitle="Kontrak baru bulan ini"
+          hoverInfo="Total modal (harga pokok) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Wallet}
-              iconColor="text-indigo-500"
-              label="Total Omset"
-              value={contractTotals.total_omset}
-              subtitle="Kontrak baru bulan ini"
-              hoverInfo="Total omset (harga jual) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
-            />
-          </div>
+        <StatCard
+          icon={Wallet}
+          iconColor="text-indigo-500"
+          label="Total Omset"
+          value={contractTotals.total_omset}
+          subtitle="Kontrak baru bulan ini"
+          hoverInfo="Total omset (harga jual) dari semua kontrak yang dibuat bulan ini — diakui penuh saat kontrak terbit (accrual)."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={TrendingUp}
-              iconColor="text-green-500"
-              label="Keuntungan Kotor"
-              value={realizedProfit}
-              valueColor="text-green-600"
-              subtitle="Omset − Modal"
-              hoverInfo="Keuntungan kotor dari kontrak-kontrak baru bulan ini, sebelum dikurangi komisi & operasional."
-            />
-          </div>
+        <StatCard
+          icon={TrendingUp}
+          iconColor="text-green-500"
+          label="Keuntungan Kotor"
+          value={realizedProfit}
+          valueColor="text-green-600"
+          subtitle="Omset − Modal"
+          hoverInfo="Keuntungan kotor dari kontrak-kontrak baru bulan ini, sebelum dikurangi komisi & operasional."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={CircleDollarSign}
-              iconColor="text-emerald-500"
-              label="Margin Kotor"
-              value={grossProfitMargin}
-              isPercentage
-              valueColor={grossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
-              subtitle="(Omset − Modal) / Modal"
-              hoverInfo="Persentase markup dari modal. Mis: 25% berarti tiap Rp 100 modal hasilkan Rp 25 keuntungan kotor."
-            />
-          </div>
+        <StatCard
+          icon={CircleDollarSign}
+          iconColor="text-emerald-500"
+          label="Margin Kotor"
+          value={grossProfitMargin}
+          isPercentage
+          valueColor={grossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
+          subtitle="(Omset − Modal) / Modal"
+          hoverInfo="Persentase markup dari modal. Mis: 25% berarti tiap Rp 100 modal hasilkan Rp 25 keuntungan kotor."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Percent}
-              iconColor="text-purple-500"
-              label="Total Komisi"
-              value={monthlyData?.total_commission ?? 0}
-              valueColor="text-purple-600"
-              subtitle="Semua sales bulan ini"
-              hoverInfo="Total komisi seluruh sales agent, dihitung dari nilai kontrak baru bulan ini × tier komisi masing-masing."
-            />
-          </div>
+        <StatCard
+          icon={Percent}
+          iconColor="text-purple-500"
+          label="Total Komisi"
+          value={monthlyData?.total_commission ?? 0}
+          valueColor="text-purple-600"
+          subtitle="Semua sales bulan ini"
+          hoverInfo="Total komisi seluruh sales agent, dihitung dari nilai kontrak baru bulan ini × tier komisi masing-masing."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={CheckCircle}
-              iconColor="text-teal-500"
-              label="Tertagih"
-              value={totalCollected}
-              valueColor="text-teal-600"
-              subtitle="Pembayaran masuk bulan ini"
-              hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak."
-            />
-          </div>
+        <StatCard
+          icon={CheckCircle}
+          iconColor="text-teal-500"
+          label="Tertagih"
+          value={totalCollected}
+          valueColor="text-teal-600"
+          subtitle="Pembayaran masuk bulan ini"
+          hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak."
+        />
 
-          <div className="w-[180px] flex-shrink-0">
-            <StatCard
-              icon={Settings}
-              iconColor="text-orange-500"
-              label="Biaya Operasional"
-              value={totalExpenses}
-              valueColor="text-orange-600"
-              isNegative
-              subtitle="Pengeluaran bulan ini"
-              hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
-            />
-          </div>
+        <StatCard
+          icon={Settings}
+          iconColor="text-orange-500"
+          label="Biaya Operasional"
+          value={totalExpenses}
+          valueColor="text-orange-600"
+          isNegative
+          subtitle="Pengeluaran bulan ini"
+          hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
+        />
 
-        </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+        <StatCard
+          icon={AlertTriangle}
+          iconColor="text-destructive"
+          label="Kerugian Return/Macet"
+          value={returnedLoss?.total_loss ?? 0}
+          valueColor="text-destructive"
+          isNegative
+          subtitle={`${returnedLoss?.returned_count ?? 0} kontrak return bulan ini`}
+          hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+        />
+      </div>
 
       {/* Net Profit Card */}
       <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
