@@ -20,8 +20,9 @@ import {
   Bar,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt } from "lucide-react";
+import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt, Ban } from "lucide-react";
 import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
+import { useMacetSummary, useMacetSummaryYearly } from "@/hooks/useMacetSummary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -67,6 +68,8 @@ export default function Dashboard() {
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
+  const { data: macetSummary } = useMacetSummary(selectedMonth);
+  const { data: macetSummaryYearly } = useMacetSummaryYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
@@ -298,12 +301,23 @@ export default function Dashboard() {
         <StatCard
           icon={AlertTriangle}
           iconColor="text-destructive"
-          label="Kerugian Return/Macet"
+          label="Kerugian (Return)"
           value={returnedLoss?.total_loss ?? 0}
           valueColor="text-destructive"
           isNegative
           subtitle={`${returnedLoss?.returned_count ?? 0} kontrak return bulan ini`}
-          hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+          hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+        />
+
+        <StatCard
+          icon={Ban}
+          iconColor="text-rose-500"
+          label="Macet"
+          value={macetSummary?.total_outstanding ?? 0}
+          valueColor="text-rose-600"
+          isNegative
+          subtitle={`${macetSummary?.macet_count ?? 0} kontrak macet bulan ini`}
+          hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat bulan ini.\nJumlah kontrak: ${macetSummary?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummary?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummary?.total_outstanding ?? 0)}`}
         />
       </div>
 
@@ -638,12 +652,23 @@ export default function Dashboard() {
                 <StatCard
                   icon={AlertTriangle}
                   iconColor="text-destructive"
-                  label="Kerugian Return/Macet"
+                  label="Kerugian (Return)"
                   value={returnedLossYearly?.total_loss ?? 0}
                   valueColor="text-destructive"
                   isNegative
                   subtitle={`${returnedLossYearly?.returned_count ?? 0} kontrak return tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                />
+
+                <StatCard
+                  icon={Ban}
+                  iconColor="text-rose-500"
+                  label="Macet"
+                  value={macetSummaryYearly?.total_outstanding ?? 0}
+                  valueColor="text-rose-600"
+                  isNegative
+                  subtitle={`${macetSummaryYearly?.macet_count ?? 0} kontrak macet tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat tahun ${selectedYear.getFullYear()}.\nJumlah kontrak: ${macetSummaryYearly?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummaryYearly?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummaryYearly?.total_outstanding ?? 0)}`}
                 />
 
               </div>
@@ -727,8 +752,9 @@ export default function Dashboard() {
                       </TableHeader>
                       <TableBody>
                         {yearlyFinancial.agents.map((agent, index) => {
-                          const profitMargin = agent.total_omset > 0 
-                            ? ((agent.profit / agent.total_omset) * 100) 
+                          // Margin = (Omset − Modal) / Modal × 100  — konsisten dengan tab bulanan
+                          const profitMargin = agent.total_modal > 0 
+                            ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
                           return (
                             <TableRow 
