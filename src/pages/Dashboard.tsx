@@ -301,12 +301,23 @@ export default function Dashboard() {
         <StatCard
           icon={AlertTriangle}
           iconColor="text-destructive"
-          label="Kerugian Return/Macet"
+          label="Kerugian (Return)"
           value={returnedLoss?.total_loss ?? 0}
           valueColor="text-destructive"
           isNegative
           subtitle={`${returnedLoss?.returned_count ?? 0} kontrak return bulan ini`}
-          hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+          hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+        />
+
+        <StatCard
+          icon={Ban}
+          iconColor="text-rose-500"
+          label="Macet"
+          value={macetSummary?.total_outstanding ?? 0}
+          valueColor="text-rose-600"
+          isNegative
+          subtitle={`${macetSummary?.macet_count ?? 0} kontrak macet bulan ini`}
+          hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat bulan ini.\nJumlah kontrak: ${macetSummary?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummary?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummary?.total_outstanding ?? 0)}`}
         />
       </div>
 
