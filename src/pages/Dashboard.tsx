@@ -752,8 +752,9 @@ export default function Dashboard() {
                       </TableHeader>
                       <TableBody>
                         {yearlyFinancial.agents.map((agent, index) => {
-                          const profitMargin = agent.total_omset > 0 
-                            ? ((agent.profit / agent.total_omset) * 100) 
+                          // Margin = (Omset − Modal) / Modal × 100  — konsisten dengan tab bulanan
+                          const profitMargin = agent.total_modal > 0 
+                            ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
                           return (
                             <TableRow 
