@@ -661,7 +661,8 @@ export default function Dashboard() {
                   valueColor="text-destructive"
                   isNegative
                   subtitle={`${returnedLossYearly?.returned_count ?? 0} kontrak return tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.\n\nKlik Detail untuk melihat per sales & kontrak.`}
+                  onDetailClick={() => { setLossDetailScope('yearly'); setLossDetailOpen(true); }}
                 />
 
                 <StatCard
