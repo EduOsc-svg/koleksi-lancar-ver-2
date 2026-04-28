@@ -894,5 +894,15 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
     </div>
+
+    <ReturnedLossDetailDialog
+      open={lossDetailOpen}
+      onOpenChange={setLossDetailOpen}
+      title={lossDetailScope === 'monthly'
+        ? `Detail Kerugian — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
+        : `Detail Kerugian — Tahun ${selectedYear.getFullYear()}`}
+      data={lossDetailScope === 'monthly' ? returnedLoss : returnedLossYearly}
+    />
+    </>
   );
 }
