@@ -652,12 +652,23 @@ export default function Dashboard() {
                 <StatCard
                   icon={AlertTriangle}
                   iconColor="text-destructive"
-                  label="Kerugian Return/Macet"
+                  label="Kerugian (Return)"
                   value={returnedLossYearly?.total_loss ?? 0}
                   valueColor="text-destructive"
                   isNegative
                   subtitle={`${returnedLossYearly?.returned_count ?? 0} kontrak return tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Kerugian dari kontrak yang di-return (macet permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                />
+
+                <StatCard
+                  icon={Ban}
+                  iconColor="text-rose-500"
+                  label="Macet"
+                  value={macetSummaryYearly?.total_outstanding ?? 0}
+                  valueColor="text-rose-600"
+                  isNegative
+                  subtitle={`${macetSummaryYearly?.macet_count ?? 0} kontrak macet tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat tahun ${selectedYear.getFullYear()}.\nJumlah kontrak: ${macetSummaryYearly?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummaryYearly?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummaryYearly?.total_outstanding ?? 0)}`}
                 />
 
               </div>
