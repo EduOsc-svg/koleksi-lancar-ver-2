@@ -68,6 +68,8 @@ export default function Dashboard() {
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
+  const { data: macetSummary } = useMacetSummary(selectedMonth);
+  const { data: macetSummaryYearly } = useMacetSummaryYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
