@@ -44,6 +44,7 @@ import { format, startOfMonth, addMonths, subMonths } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChart";
+import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -52,6 +53,8 @@ export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState(new Date());
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string; code: string } | null>(null);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [lossDetailOpen, setLossDetailOpen] = useState(false);
+  const [lossDetailScope, setLossDetailScope] = useState<'monthly' | 'yearly'>('monthly');
   const [newExpense, setNewExpense] = useState<OperationalExpenseInput>({
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
@@ -192,6 +195,7 @@ export default function Dashboard() {
   };
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -306,7 +310,8 @@ export default function Dashboard() {
           valueColor="text-destructive"
           isNegative
           subtitle={`${returnedLoss?.returned_count ?? 0} kontrak return bulan ini`}
-          hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+          hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) di bulan ini.\nModal hilang: ${formatRupiah(returnedLoss?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLoss?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.\n\nKlik Detail untuk melihat per sales & kontrak.`}
+          onDetailClick={() => { setLossDetailScope('monthly'); setLossDetailOpen(true); }}
         />
 
         <StatCard
@@ -657,7 +662,8 @@ export default function Dashboard() {
                   valueColor="text-destructive"
                   isNegative
                   subtitle={`${returnedLossYearly?.returned_count ?? 0} kontrak return tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.`}
+                  hoverInfo={`Kerugian dari kontrak yang di-return (dihapus permanen) sepanjang tahun ${selectedYear.getFullYear()}.\nModal hilang: ${formatRupiah(returnedLossYearly?.total_modal_loss ?? 0)}\nSempat tertagih: ${formatRupiah(returnedLossYearly?.total_collected_back ?? 0)}\nKerugian bersih = Modal − Tertagih.\n\nKlik Detail untuk melihat per sales & kontrak.`}
+                  onDetailClick={() => { setLossDetailScope('yearly'); setLossDetailOpen(true); }}
                 />
 
                 <StatCard
@@ -889,5 +895,15 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
     </div>
+
+    <ReturnedLossDetailDialog
+      open={lossDetailOpen}
+      onOpenChange={setLossDetailOpen}
+      title={lossDetailScope === 'monthly'
+        ? `Detail Kerugian — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
+        : `Detail Kerugian — Tahun ${selectedYear.getFullYear()}`}
+      data={lossDetailScope === 'monthly' ? returnedLoss : returnedLossYearly}
+    />
+    </>
   );
 }
