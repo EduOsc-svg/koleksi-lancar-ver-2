@@ -1,8 +1,18 @@
-import { useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useAuth() {
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,14 +23,14 @@ export function useAuth() {
 
     const initAuth = async () => {
       try {
-        // Restore session DULU dari storage sebelum subscribe
+        // Restore session from storage
         const { data: { session } } = await supabase.auth.getSession();
         
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
 
-          // Subscribe SETELAH restore selesai
+          // Subscribe to auth state changes
           const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, newSession) => {
               if (mounted) {
@@ -56,11 +66,25 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
-  return {
+  const value: AuthContextType = {
     user,
     session,
     isLoading,
-    signOut,
     isAuthenticated: !!session,
+    signOut,
   };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuthContext() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuthContext must be used within AuthProvider");
+  }
+  return context;
 }

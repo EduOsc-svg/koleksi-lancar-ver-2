@@ -308,30 +308,54 @@ export default function Contracts() {
   };
 
   const handleSubmit = async () => {
+    // Validation for customer (required for both create and update)
     if (!formData.customer_id) {
-      toast.error("Pilih pelanggan terlebih dahulu");
+      toast.error("Pelanggan harus dipilih");
       return;
     }
+    
+    // Validation for start date (required for both create and update)
     if (!formData.start_date) {
-      toast.error("Pilih tanggal mulai terlebih dahulu");
+      toast.error("Tanggal mulai harus diisi");
       return;
     }
-    if (!selectedContract && !formData.sales_agent_id) {
-      toast.error("Pilih sales agent terlebih dahulu");
+    
+    // Validation for total loan amount (required for both create and update)
+    if (!formData.total_loan_amount || formData.total_loan_amount <= 0) {
+      toast.error("Total pinjaman harus diisi dan lebih dari 0");
       return;
     }
-    if (!selectedContract && !formData.collector_id) {
-      toast.error("Pilih kolektor terlebih dahulu");
+    
+    // Validation for tenor days (required for both create and update)
+    if (!formData.tenor_days || parseInt(formData.tenor_days) <= 0) {
+      toast.error("Tenor harus diisi dan lebih dari 0");
       return;
+    }
+    
+    // Validation for modal awal (required for both create and update)
+    if (!formData.modal || formData.modal <= 0) {
+      toast.error("Modal awal harus diisi dan lebih dari 0");
+      return;
+    }
+    
+    // Validation for new contracts (CREATE only)
+    if (!selectedContract) {
+      if (!formData.sales_agent_id) {
+        toast.error("Sales agent harus dipilih untuk kontrak baru");
+        return;
+      }
+      if (!formData.collector_id) {
+        toast.error("Kolektor harus dipilih untuk kontrak baru");
+        return;
+      }
     }
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
-      // Keuntungan dihitung OTOMATIS: (Total Pinjaman − Modal Efektif). Disimpan sebagai TOTAL keuntungan.
       const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
-      const totalKeuntungan = Math.max(0, (formData.total_loan_amount || 0) - modalEfektif);
 
       if (selectedContract) {
+        // UPDATE KONTRAK
         await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
@@ -344,10 +368,11 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-            omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: totalKeuntungan,
+          omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
         } as any);
+        toast.success("Kontrak berhasil diperbarui");
       } else {
+        // CREATE KONTRAK
         const { data: newContract } = await createContract.mutateAsync({
           contract_ref: formData.contract_ref,
           customer_id: formData.customer_id,
@@ -359,8 +384,7 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-            omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
-            keuntungan: totalKeuntungan,
+          omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
         } as any);
         
         // Generate installment coupons for new active contracts
@@ -378,8 +402,20 @@ export default function Contracts() {
       }
       setDialogOpen(false);
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal menyimpan data");
+      console.error('Update/Create contract error:', error);
+      
+      // Provide specific error message
+      if (error instanceof Error) {
+        if (error.message.includes('permission')) {
+          toast.error("Anda tidak memiliki izin untuk melakukan operasi ini");
+        } else if (error.message.includes('unique')) {
+          toast.error("Kode kontrak sudah digunakan. Gunakan kode yang berbeda.");
+        } else {
+          toast.error(`Gagal menyimpan data: ${error.message}`);
+        }
+      } else {
+        toast.error("Gagal menyimpan data. Silakan coba lagi.");
+      }
     }
   };
 
@@ -890,7 +926,9 @@ export default function Contracts() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="customer">Pelanggan</Label>
+                    <Label htmlFor="customer">
+                      Pelanggan <span className="text-red-500">*</span>
+                    </Label>
                     <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                       <PopoverTrigger asChild>
                         <Button
@@ -938,7 +976,9 @@ export default function Contracts() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="sales_agent">Sales Agent</Label>
+                  <Label htmlFor="sales_agent">
+                    Sales Agent {!selectedContract && <span className="text-red-500">*</span>}
+                  </Label>
                   <Popover open={salesAgentOpen} onOpenChange={setSalesAgentOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -991,7 +1031,9 @@ export default function Contracts() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="collector">Kolektor</Label>
+                  <Label htmlFor="collector">
+                    Kolektor {!selectedContract && <span className="text-red-500">*</span>}
+                  </Label>
                   <Popover open={collectorOpen} onOpenChange={setCollectorOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -1045,7 +1087,9 @@ export default function Contracts() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="start_date">Tanggal Mulai</Label>
+                    <Label htmlFor="start_date">
+                      Tanggal Mulai <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="start_date"
                       type="date"
@@ -1076,7 +1120,9 @@ export default function Contracts() {
                 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-2">
-                    <Label htmlFor="product_type">Jenis Produk</Label>
+                    <Label htmlFor="product_type">
+                      Jenis Produk <span className="text-gray-400 text-xs">(opsional)</span>
+                    </Label>
                     <Textarea
                       id="product_type"
                       value={formData.product_type}
@@ -1087,7 +1133,9 @@ export default function Contracts() {
                     <p className="text-xs text-muted-foreground mt-1">Tuliskan jenis produk. Jika panjang, kotak ini dapat digulir.</p>
                   </div>
                   <div>
-                    <Label htmlFor="tenor_days">Tenor (Hari)</Label>
+                    <Label htmlFor="tenor_days">
+                      Tenor (Hari) <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="tenor_days"
                       type="number"
@@ -1100,7 +1148,9 @@ export default function Contracts() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="total_loan_amount">Total Pinjaman</Label>
+                    <Label htmlFor="total_loan_amount">
+                      Total Pinjaman <span className="text-red-500">*</span>
+                    </Label>
                     <CurrencyInput
                       id="total_loan_amount"
                       value={formData.total_loan_amount}
@@ -1124,7 +1174,9 @@ export default function Contracts() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="modal">Modal Awal</Label>
+                    <Label htmlFor="modal">
+                      Modal Awal <span className="text-red-500">*</span>
+                    </Label>
                     <CurrencyInput
                       id="modal"
                       value={formData.modal}
@@ -1136,7 +1188,9 @@ export default function Contracts() {
                     </p>
                   </div>
                   <div>
-                    <Label htmlFor="dp">DP (Down Payment)</Label>
+                    <Label htmlFor="dp">
+                      DP (Down Payment) <span className="text-gray-400 text-xs">(opsional)</span>
+                    </Label>
                     <CurrencyInput
                       id="dp"
                       value={formData.dp}
