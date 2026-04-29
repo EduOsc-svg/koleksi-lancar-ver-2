@@ -301,7 +301,8 @@ export default function SalesAgents() {
 
     // ===== SHEET 1: Semua Sales =====
     // Kolom dihapus per request user: Kode Sales (juga tanggal/kolektor/kode kolektor/status/sisa - tidak relevan di sheet ini)
-    const HEADERS_1 = ['No', 'Nama', 'Telepon', 'Komisi % (Dinamis)', 'Total Omset', 'Komisi (Berdasarkan Tier)', 'Jumlah Kontrak'];
+    // Komisi hanya ditampilkan untuk yang 0.8% (bonus tahunan), tanpa SUM kolom komisi
+    const HEADERS_1 = ['No', 'Nama', 'Telepon', 'Komisi % (Dinamis)', 'Total Omset', 'Komisi (0.8% Tahunan)', 'Jumlah Kontrak'];
     const COL_WIDTHS_1 = [5, 22, 18, 20, 22, 25, 16];
 
     const ws1 = workbook.addWorksheet('Semua Sales');
@@ -309,7 +310,7 @@ export default function SalesAgents() {
     // Title row
     ws1.mergeCells('A1:G1');
     const titleCell = ws1.getCell('A1');
-    titleCell.value = 'LAPORAN SALES AGENT';
+    titleCell.value = 'LAPORAN PERFORMA SALES AGENT TAHUNAN';
     titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
     titleCell.alignment = { horizontal: 'center' };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
@@ -340,15 +341,17 @@ export default function SalesAgents() {
       // Use booked omset if available so commission follows displayed omset
       const displayOmset = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
       const dynamicPct = calculateTieredCommission(displayOmset, commissionTiers) / 100;
+      // Bonus tahunan 0.8% hanya untuk kolom komisi
+      const yearlyBonusComission = displayOmset * 0.008; // 0.8%
 
-      // Layout baru: No | Nama | Telepon | Komisi % | Omset | Komisi | Jumlah Kontrak
+      // Layout baru: No | Nama | Telepon | Komisi % | Omset | Komisi 0.8% | Jumlah Kontrak
       const dataRow = ws1.addRow([
         i + 1,
         agent.name,
         agent.phone || '-',
         dynamicPct,
         displayOmset,
-        { formula: `E${rowNum}*D${rowNum}` },
+        yearlyBonusComission,
         omsetData?.total_contracts || 0,
       ]);
 
@@ -366,13 +369,13 @@ export default function SalesAgents() {
       });
     });
 
-    // Total row
+    // Total row - hanya untuk omset dan kontrak, tidak ada SUM untuk komisi
     if (agents.length > 0) {
       const endRow1 = startRow1 + agents.length - 1;
       const totalRow1 = ws1.addRow([
         '', '', 'TOTAL', '',
         { formula: `SUM(E${startRow1}:E${endRow1})` },
-        { formula: `SUM(F${startRow1}:F${endRow1})` },
+        '', // Komisi tidak di-SUM (hanya 0.8% per baris, tidak dijumlahkan)
         { formula: `SUM(G${startRow1}:G${endRow1})` },
       ]);
       totalRow1.eachCell((cell, colNumber) => {

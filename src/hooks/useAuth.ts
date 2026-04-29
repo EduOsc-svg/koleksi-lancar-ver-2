@@ -8,24 +8,26 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST (jangan ubah isLoading di sini —
-    // INITIAL_SESSION bisa fire dengan session=null sebelum restore selesai)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-      }
-    );
-
-    // THEN restore existing session dari storage. Hanya di sinilah
-    // isLoading boleh di-set false, agar ProtectedRoute tidak redirect prematur.
+    // Restore session DULU dari storage sebelum subscribe
+    // Ini mencegah race condition dimana onAuthStateChange fire dengan session=null
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
 
-    return () => subscription.unsubscribe();
+      // BARU subscribe SETELAH restore selesai
+      // Ini memastikan isLoading=false sebelum onAuthStateChange bisa fire dengan session=null
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          console.log('Auth state changed:', { event: _event, hasSession: !!session });
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+      );
+
+      setIsLoading(false);
+
+      return () => subscription.unsubscribe();
+    });
   }, []);
 
   const signOut = async () => {
