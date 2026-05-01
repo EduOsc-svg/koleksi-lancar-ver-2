@@ -577,8 +577,12 @@ export default function SalesAgents() {
   const periodLabel = periodParam === 'yearly'
     ? `Tahun ${effectiveYear}`
     : `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
-  const omsetColLabel = periodParam === 'yearly' ? 'Omset Tahunan' : 'Omset Bulan Ini';
-  const commissionColLabel = periodParam === 'yearly' ? 'Komisi Tahunan' : 'Komisi Bulan Ini';
+  const omsetColLabel = periodParam === 'yearly'
+    ? `Omset ${effectiveYear}`
+    : `Omset ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
+  const commissionColLabel = periodParam === 'yearly'
+    ? `Komisi ${effectiveYear}`
+    : `Komisi ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
 
   return (
     <div className="space-y-6">
