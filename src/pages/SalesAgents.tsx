@@ -474,14 +474,14 @@ export default function SalesAgents() {
       // Title
       sheet.mergeCells('A1:F1');
       const t1 = sheet.getCell('A1');
-      t1.value = `LAPORAN DETAIL - ${agent.name.toUpperCase()} (${agent.agent_code})`;
+      t1.value = `LAPORAN DETAIL - ${agent.name.toUpperCase()} (${agent.agent_code}) - ${exportPeriodLabel.toUpperCase()}`;
       t1.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
       t1.alignment = { horizontal: 'center' };
       t1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       sheet.mergeCells('A2:F2');
       const d1 = sheet.getCell('A2');
-      d1.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} (Cash Basis)`;
+      d1.value = `Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Periode: ${exportPeriodLabel}`;
       d1.font = { italic: true, size: 12 };
       d1.alignment = { horizontal: 'center' };
 
