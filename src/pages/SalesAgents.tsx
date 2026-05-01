@@ -243,8 +243,9 @@ export default function SalesAgents() {
   };
 
   const getAgentOmset = (agentId: string) => {
-    // Build a period-specific map for quick lookup
-    // monthlyData.agents (if period=monthly) and yearlyFinancial.agents (if period=yearly) contain per-agent summaries
+    // Period-specific record dari hook yang sudah filter sesuai periode terpilih.
+    // - monthly: monthlyData.agents (kontrak start_date di bulan terpilih)
+    // - yearly:  yearlyFinancial.agents (kontrak start_date di tahun terpilih)
     let periodRecord: any = undefined;
     if (periodParam === 'monthly' && monthlyData?.agents) {
       periodRecord = monthlyData.agents.find((a: any) => a.agent_id === agentId || a.agent_code === getAgentCode(agentId));
@@ -253,27 +254,25 @@ export default function SalesAgents() {
     }
 
     const lifetime = agentOmsetData?.find((d) => d.agent_id === agentId);
-    const agentData = agents?.find((a) => a.id === agentId);
 
-    // For monthly period, use monthly_omset and monthly_commission from sales_agents table (reset every 1st day)
-    const useMonthlyTracking = periodParam === 'monthly' && agentData;
-    const monthlyOmset = useMonthlyTracking ? (agentData?.monthly_omset || 0) : undefined;
-    const monthlyCommission = useMonthlyTracking ? (agentData?.monthly_commission || 0) : undefined;
+    // Untuk periode bulanan/tahunan, SELALU gunakan periodRecord (akan 0 jika tidak ada kontrak di periode itu).
+    // Tidak fallback ke lifetime/monthly_omset rolling agar selaras dengan periode yang dipilih user.
+    const total_omset = periodRecord?.total_omset ?? 0;
+    const total_commission = periodRecord?.total_commission ?? 0;
 
-    // Normalize fields expected by the UI: total_omset, total_commission, commission_percentage, total_contracts
     const normalized: any = {
       agent_id: agentId,
       agent_name: undefined,
       agent_code: undefined,
       commission_percentage: periodRecord?.commission_percentage ?? lifetime?.commission_percentage ?? 0,
-      total_omset: useMonthlyTracking ? monthlyOmset : (periodRecord?.total_omset ?? lifetime?.total_omset ?? 0),
-      total_modal: periodRecord?.total_modal ?? lifetime?.total_modal ?? 0,
-      total_contracts: periodRecord?.total_contracts ?? lifetime?.total_contracts ?? 0,
-      total_commission: useMonthlyTracking ? monthlyCommission : (periodRecord?.total_commission ?? lifetime?.total_commission ?? 0),
+      total_omset,
+      total_modal: periodRecord?.total_modal ?? 0,
+      total_contracts: periodRecord?.total_contracts ?? periodRecord?.contracts_count ?? 0,
+      total_commission,
       booked_total_omset: lifetime?.booked_total_omset,
       booked_total_modal: lifetime?.booked_total_modal,
       booked_contracts_count: lifetime?.booked_contracts_count,
-      profit: periodRecord?.profit ?? lifetime?.profit ?? 0,
+      profit: periodRecord?.profit ?? 0,
     };
 
     return normalized;
