@@ -45,6 +45,8 @@ import { id as idLocale } from "date-fns/locale";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChart";
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
+import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
+import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -55,6 +57,8 @@ export default function Dashboard() {
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [lossDetailOpen, setLossDetailOpen] = useState(false);
   const [lossDetailScope, setLossDetailScope] = useState<'monthly' | 'yearly'>('monthly');
+  const [outstandingDetailOpen, setOutstandingDetailOpen] = useState(false);
+  const [outstandingDetailScope, setOutstandingDetailScope] = useState<'monthly' | 'yearly'>('monthly');
   const [newExpense, setNewExpense] = useState<OperationalExpenseInput>({
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
@@ -73,6 +77,8 @@ export default function Dashboard() {
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
   const { data: macetSummary } = useMacetSummary(selectedMonth);
   const { data: macetSummaryYearly } = useMacetSummaryYearly(selectedYear);
+  const { data: outstandingMonthly } = useOutstandingDetailsMonthly(selectedMonth);
+  const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
@@ -287,8 +293,9 @@ export default function Dashboard() {
           label="Sisa Tagihan"
           value={monthlyData?.total_to_collect ?? 0}
           valueColor="text-red-600"
-          subtitle="Kupon belum bayar bulan ini"
-          hoverInfo="Total kupon cicilan yang masih belum dibayar dalam bulan ini (jatuh tempo bulan ini, status unpaid)."
+          subtitle="Kontrak baru bulan ini"
+          hoverInfo={`Sisa tagihan dari kontrak yang dibuat bulan ini.\nRumus per kontrak: (Cicilan harian × Tenor) − Total Pembayaran (ALL TIME).\n\nKlik Detail untuk lihat per sales & per kontrak.`}
+          onDetailClick={() => { setOutstandingDetailScope('monthly'); setOutstandingDetailOpen(true); }}
         />
 
         <StatCard
@@ -640,7 +647,8 @@ export default function Dashboard() {
                   value={yearlyFinancial?.total_to_collect ?? 0}
                   valueColor="text-teal-600"
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}`}
+                  hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}\n\nKlik Detail untuk lihat per sales & per kontrak.`}
+                  onDetailClick={() => { setOutstandingDetailScope('yearly'); setOutstandingDetailOpen(true); }}
                 />
 
                 <StatCard
@@ -903,6 +911,15 @@ export default function Dashboard() {
         ? `Detail Kerugian — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
         : `Detail Kerugian — Tahun ${selectedYear.getFullYear()}`}
       data={lossDetailScope === 'monthly' ? returnedLoss : returnedLossYearly}
+    />
+
+    <OutstandingDetailDialog
+      open={outstandingDetailOpen}
+      onOpenChange={setOutstandingDetailOpen}
+      title={outstandingDetailScope === 'monthly'
+        ? `Detail Sisa Tagihan — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
+        : `Detail Sisa Tagihan — Tahun ${selectedYear.getFullYear()}`}
+      data={outstandingDetailScope === 'monthly' ? outstandingMonthly : outstandingYearly}
     />
     </>
   );

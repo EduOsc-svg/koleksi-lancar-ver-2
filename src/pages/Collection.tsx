@@ -29,6 +29,10 @@ import { exportHandoverPerCollectorDaily } from "@/lib/exportHandoverPerCollecto
 import { exportPaymentPerCollectorDaily } from "@/lib/exportPaymentPerCollectorDaily";
 
 export default function Collection() {
+  // Manifest state (declared first so hooks below can use them)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
   const { data: collectors } = useCollectors();
   const { data: contracts, isLoading: contractsLoading } = useContracts("active");
   const { data: salesAgents } = useSalesAgents();
@@ -37,10 +41,6 @@ export default function Collection() {
   const createBulkPayment = useCreateBulkPayment();
   const createHandover = useCreateCouponHandover();
   const { data: handovers, isLoading: handoversLoading } = useCouponHandovers(selectedDate);
-
-  // Manifest state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   // Selected contract id for payment form (lifted state to allow selection from search results)
   const [paymentSelectedContract, setPaymentSelectedContract] = useState("");
   // Sort states per tab

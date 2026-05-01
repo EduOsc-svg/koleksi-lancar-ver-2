@@ -9,8 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
  *   - Fallback: nama pelanggan (lowercase, trim) jika HP kosong
  *
  * Definisi:
- *   - Lama = pelanggan yang punya ≥2 kontrak (lintas agen, total)
- *   - Baru = pelanggan yang hanya punya 1 kontrak
+ *   - Lama = pelanggan yang punya ≥2 kontrak (dilihat dari SELURUH histori, lintas agen)
+ *   - Baru = pelanggan yang hanya punya 1 kontrak total
+ *
+ * Filter periode (opsional):
+ *   Jika `startDate`/`endDate` diberikan (format yyyy-MM-dd), maka per-agen hanya
+ *   menghitung pelanggan yang punya kontrak dengan agen tersebut DI DALAM periode itu.
+ *   Klasifikasi Baru/Lama tetap mengacu ke total kontrak lifetime pelanggan (lintas agen).
  */
 
 const normalizePhone = (phone: string | null | undefined): string => {
@@ -32,21 +37,21 @@ export interface AgentCustomerCounts {
   lama: number;
 }
 
-export const useAgentCustomerCounts = () => {
+export const useAgentCustomerCounts = (startDate?: string, endDate?: string) => {
   return useQuery({
-    queryKey: ['agent_customer_counts'],
+    queryKey: ['agent_customer_counts', startDate || 'all', endDate || 'all'],
     queryFn: async () => {
-      const { data: contracts, error } = await supabase
+      // Ambil SEMUA kontrak untuk lifetime classification…
+      const { data: allContracts, error: allErr } = await supabase
         .from('credit_contracts')
-        .select('sales_agent_id, customer_id, customers(name, phone)');
-      if (error) throw error;
+        .select('sales_agent_id, customer_id, start_date, customers(name, phone)');
+      if (allErr) throw allErr;
 
-      // 1) Hitung jumlah kontrak global per "customer key"
+      // 1) Hitung jumlah kontrak global per "customer key" (lifetime, lintas agen)
       const contractCountByKey = new Map<string, number>();
-      // 2) Map customer_id → key (agar konsisten saat dipakai per agen)
       const keyByCustomerId = new Map<string, string>();
 
-      (contracts || []).forEach((row: any) => {
+      (allContracts || []).forEach((row: any) => {
         const phoneKey = normalizePhone(row.customers?.phone);
         const nameKey = normalizeName(row.customers?.name);
         const key = phoneKey ? `p:${phoneKey}` : nameKey ? `n:${nameKey}` : null;
@@ -55,10 +60,22 @@ export const useAgentCustomerCounts = () => {
         if (row.customer_id) keyByCustomerId.set(row.customer_id, key);
       });
 
-      // 3) Per agen: kumpulkan pelanggan UNIK (berdasarkan key), lalu klasifikasi
+      // 2) Tentukan kontrak yang dipakai untuk per-agen counting
+      //    (filter periode jika ada)
+      const inPeriod = (startDate || endDate)
+        ? (allContracts || []).filter((row: any) => {
+            if (!row.start_date) return false;
+            const d = String(row.start_date).slice(0, 10);
+            if (startDate && d < startDate) return false;
+            if (endDate && d > endDate) return false;
+            return true;
+          })
+        : (allContracts || []);
+
+      // 3) Per agen: kumpulkan pelanggan UNIK dalam periode, klasifikasi pakai lifetime
       const perAgent = new Map<string, { baru: Set<string>; lama: Set<string> }>();
 
-      (contracts || []).forEach((row: any) => {
+      inPeriod.forEach((row: any) => {
         const agentId = row.sales_agent_id;
         if (!agentId || !row.customer_id) return;
         const key = keyByCustomerId.get(row.customer_id);

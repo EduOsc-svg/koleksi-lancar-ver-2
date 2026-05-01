@@ -62,7 +62,6 @@ export default function SalesAgents() {
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
   const { data: agentOmsetData } = useAgentOmset();
-  const { data: agentCustomerCounts } = useAgentCustomerCounts();
   
   // Get URL parameters
   const periodParam = searchParams.get('period') || 'monthly';
@@ -77,6 +76,18 @@ export default function SalesAgents() {
   const selectedMonthForHook = new Date(effectiveMonth);
   const selectedYearForHook = new Date(Number(effectiveYear), 0, 1);
 
+  // Period range (yyyy-MM-dd) untuk filter pelanggan baru/lama agar selaras dengan periode
+  const periodRange = (() => {
+    if (periodParam === 'yearly') {
+      const y = Number(effectiveYear);
+      return { start: `${y}-01-01`, end: `${y}-12-31` };
+    }
+    const start = format(startOfMonth(selectedMonthForHook), 'yyyy-MM-dd');
+    const end = format(new Date(selectedMonthForHook.getFullYear(), selectedMonthForHook.getMonth() + 1, 0), 'yyyy-MM-dd');
+    return { start, end };
+  })();
+
+  const { data: agentCustomerCounts } = useAgentCustomerCounts(periodRange.start, periodRange.end);
   const { data: monthlyData } = useMonthlyPerformance(selectedMonthForHook);
   const { data: yearlyFinancial } = useYearlyFinancialSummary(selectedYearForHook as Date);
   const { data: commissionTiers } = useCommissionTiers();
@@ -232,8 +243,9 @@ export default function SalesAgents() {
   };
 
   const getAgentOmset = (agentId: string) => {
-    // Build a period-specific map for quick lookup
-    // monthlyData.agents (if period=monthly) and yearlyFinancial.agents (if period=yearly) contain per-agent summaries
+    // Period-specific record dari hook yang sudah filter sesuai periode terpilih.
+    // - monthly: monthlyData.agents (kontrak start_date di bulan terpilih)
+    // - yearly:  yearlyFinancial.agents (kontrak start_date di tahun terpilih)
     let periodRecord: any = undefined;
     if (periodParam === 'monthly' && monthlyData?.agents) {
       periodRecord = monthlyData.agents.find((a: any) => a.agent_id === agentId || a.agent_code === getAgentCode(agentId));
@@ -242,27 +254,25 @@ export default function SalesAgents() {
     }
 
     const lifetime = agentOmsetData?.find((d) => d.agent_id === agentId);
-    const agentData = agents?.find((a) => a.id === agentId);
 
-    // For monthly period, use monthly_omset and monthly_commission from sales_agents table (reset every 1st day)
-    const useMonthlyTracking = periodParam === 'monthly' && agentData;
-    const monthlyOmset = useMonthlyTracking ? (agentData?.monthly_omset || 0) : undefined;
-    const monthlyCommission = useMonthlyTracking ? (agentData?.monthly_commission || 0) : undefined;
+    // Untuk periode bulanan/tahunan, SELALU gunakan periodRecord (akan 0 jika tidak ada kontrak di periode itu).
+    // Tidak fallback ke lifetime/monthly_omset rolling agar selaras dengan periode yang dipilih user.
+    const total_omset = periodRecord?.total_omset ?? 0;
+    const total_commission = periodRecord?.total_commission ?? 0;
 
-    // Normalize fields expected by the UI: total_omset, total_commission, commission_percentage, total_contracts
     const normalized: any = {
       agent_id: agentId,
       agent_name: undefined,
       agent_code: undefined,
       commission_percentage: periodRecord?.commission_percentage ?? lifetime?.commission_percentage ?? 0,
-      total_omset: useMonthlyTracking ? monthlyOmset : (periodRecord?.total_omset ?? lifetime?.total_omset ?? 0),
-      total_modal: periodRecord?.total_modal ?? lifetime?.total_modal ?? 0,
-      total_contracts: periodRecord?.total_contracts ?? lifetime?.total_contracts ?? 0,
-      total_commission: useMonthlyTracking ? monthlyCommission : (periodRecord?.total_commission ?? lifetime?.total_commission ?? 0),
+      total_omset,
+      total_modal: periodRecord?.total_modal ?? 0,
+      total_contracts: periodRecord?.total_contracts ?? periodRecord?.contracts_count ?? 0,
+      total_commission,
       booked_total_omset: lifetime?.booked_total_omset,
       booked_total_modal: lifetime?.booked_total_modal,
       booked_contracts_count: lifetime?.booked_contracts_count,
-      profit: periodRecord?.profit ?? lifetime?.profit ?? 0,
+      profit: periodRecord?.profit ?? 0,
     };
 
     return normalized;
@@ -567,8 +577,12 @@ export default function SalesAgents() {
   const periodLabel = periodParam === 'yearly'
     ? `Tahun ${effectiveYear}`
     : `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
-  const omsetColLabel = periodParam === 'yearly' ? 'Omset Tahunan' : 'Omset Bulan Ini';
-  const commissionColLabel = periodParam === 'yearly' ? 'Komisi Tahunan' : 'Komisi Bulan Ini';
+  const omsetColLabel = periodParam === 'yearly'
+    ? `Omset ${effectiveYear}`
+    : `Omset ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
+  const commissionColLabel = periodParam === 'yearly'
+    ? `Komisi ${effectiveYear}`
+    : `Komisi ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
 
   return (
     <div className="space-y-6">
@@ -637,8 +651,8 @@ export default function SalesAgents() {
         </div>
         <p className="text-xs text-muted-foreground ml-auto">
           {periodParam === 'monthly'
-            ? 'Omset & komisi sales otomatis reset setiap tanggal 1'
-            : 'Akumulasi sepanjang tahun yang dipilih'}
+            ? 'Omset, komisi & jumlah pelanggan baru/lama mengikuti bulan terpilih (reset tiap tgl 1)'
+            : 'Akumulasi omset, komisi & pelanggan sepanjang tahun yang dipilih'}
         </p>
       </div>
 
