@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, Download, Eye, Settings } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Eye, Settings, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { format, addMonths, subMonths, startOfMonth } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 import ExcelJS from "exceljs";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -490,6 +492,42 @@ export default function SalesAgents() {
     toast.success("Excel berhasil di-export dengan detail per sales agent!");
   };
 
+  // Period control helpers
+  const setPeriod = (p: 'monthly' | 'yearly') => {
+    const sp = new URLSearchParams(searchParams);
+    sp.set('period', p);
+    if (p === 'monthly') {
+      sp.delete('year');
+      if (!sp.get('month')) sp.set('month', format(startOfMonth(new Date()), 'yyyy-MM'));
+    } else {
+      sp.delete('month');
+      if (!sp.get('year')) sp.set('year', String(new Date().getFullYear()));
+    }
+    setSearchParams(sp, { replace: true });
+  };
+  const shiftMonth = (delta: number) => {
+    const sp = new URLSearchParams(searchParams);
+    const base = monthParam ? new Date(monthParam) : new Date();
+    const next = delta < 0 ? subMonths(base, Math.abs(delta)) : addMonths(base, delta);
+    sp.set('period', 'monthly');
+    sp.set('month', format(startOfMonth(next), 'yyyy-MM'));
+    sp.delete('year');
+    setSearchParams(sp, { replace: true });
+  };
+  const shiftYear = (delta: number) => {
+    const sp = new URLSearchParams(searchParams);
+    const base = yearParam ? Number(yearParam) : new Date().getFullYear();
+    sp.set('period', 'yearly');
+    sp.set('year', String(base + delta));
+    sp.delete('month');
+    setSearchParams(sp, { replace: true });
+  };
+  const periodLabel = periodParam === 'yearly'
+    ? `Tahun ${yearParam || new Date().getFullYear()}`
+    : `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
+  const omsetColLabel = periodParam === 'yearly' ? 'Omset Tahunan' : 'Omset Bulan Ini';
+  const commissionColLabel = periodParam === 'yearly' ? 'Komisi Tahunan' : 'Komisi Bulan Ini';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -505,6 +543,61 @@ export default function SalesAgents() {
             <Plus className="mr-2 h-4 w-4" /> {t("salesAgents.newAgent")}
           </Button>
         </div>
+      </div>
+
+      {/* Period selector */}
+      <div className="flex flex-wrap items-center gap-3 p-3 border rounded-lg bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Periode:</span>
+        </div>
+        <div className="flex gap-1">
+          <Button
+            variant={periodParam === 'monthly' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPeriod('monthly')}
+          >
+            Bulanan
+          </Button>
+          <Button
+            variant={periodParam === 'yearly' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPeriod('yearly')}
+          >
+            Tahunan
+          </Button>
+        </div>
+        <div className="flex items-center gap-1 ml-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => periodParam === 'yearly' ? shiftYear(-1) : shiftMonth(-1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="font-semibold min-w-[200px] text-center text-sm capitalize">
+            {periodLabel}
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => periodParam === 'yearly' ? shiftYear(1) : shiftMonth(1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => periodParam === 'yearly' ? shiftYear(new Date().getFullYear() - (Number(yearParam) || new Date().getFullYear())) : shiftMonth(0)}
+          >
+            {periodParam === 'yearly' ? 'Tahun Ini' : 'Bulan Ini'}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground ml-auto">
+          {periodParam === 'monthly'
+            ? 'Omset & komisi sales otomatis reset setiap tanggal 1'
+            : 'Akumulasi sepanjang tahun yang dipilih'}
+        </p>
       </div>
 
       {/* Search Input */}
@@ -531,8 +624,8 @@ export default function SalesAgents() {
               <TableHead>{t("salesAgents.agentCode")}</TableHead>
               <TableHead>{t("salesAgents.name")}</TableHead>
               <TableHead>{t("salesAgents.phone")}</TableHead>
-              <TableHead>{t("salesAgents.totalOmset", "Total Omset")}</TableHead>
-              <TableHead>{t("salesAgents.earnings", "Komisi")}</TableHead>
+              <TableHead>{omsetColLabel}</TableHead>
+              <TableHead>{commissionColLabel}</TableHead>
               <TableHead className="text-center" title="Pelanggan Baru (hanya 1 kontrak)">B</TableHead>
               <TableHead className="text-center" title="Pelanggan Lama (≥2 kontrak)">L</TableHead>
               <TableHead className="text-right">{t("common.actions")}</TableHead>
@@ -553,14 +646,13 @@ export default function SalesAgents() {
               paginatedItems.map((agent) => {
                 const omsetData = getAgentOmset(agent.id);
                 // Ensure we show a commission value even if the hook didn't compute it
+                // Period-based omset (reset tiap tgl 1 jika monthly)
+                const displayOmset = omsetData?.total_omset || 0;
                 const fallbackCommission = (() => {
-                  const displayOmsetLocal = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
-                  // Try tiered commission first (if tiers present), otherwise use agent fixed pct
                   const dynamicPctLocal = commissionTiers && commissionTiers.length > 0
-                    ? calculateTieredCommission(displayOmsetLocal, commissionTiers)
+                    ? calculateTieredCommission(displayOmset, commissionTiers)
                     : Number(agent.commission_percentage) || 0;
-                  const computed = (displayOmsetLocal * (Number(dynamicPctLocal) || 0)) / 100;
-                  return computed;
+                  return (displayOmset * (Number(dynamicPctLocal) || 0)) / 100;
                 })();
                 return (
                   <TableRow 
@@ -573,9 +665,9 @@ export default function SalesAgents() {
                     <TableCell className="font-medium">{agent.agent_code}</TableCell>
                     <TableCell>{agent.name}</TableCell>
                     <TableCell>{agent.phone || "-"}</TableCell>
-                    <TableCell className="font-medium">{formatRupiah((omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0)}</TableCell>
+                    <TableCell className="font-medium">{formatRupiah(displayOmset)}</TableCell>
                     <TableCell className="font-medium text-primary">
-                      {formatRupiah( (omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission )}
+                      {formatRupiah((omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
