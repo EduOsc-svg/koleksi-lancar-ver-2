@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { FileText, CreditCard, AlertCircle, TrendingUp, Download } from "lucide-react";
+import { FileText, CreditCard, AlertCircle, TrendingUp, Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { ManifestFilters } from "@/components/collection/ManifestFilters";
 import { ManifestTable } from "@/components/collection/ManifestTable";
 import { DailyDueList } from "@/components/collection/DailyDueList";
 import { DailyProfitList } from "@/components/collection/DailyProfitList";
+import { CollectorDailyPerformance } from "@/components/collection/CollectorDailyPerformance";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePaymentsByContract } from "@/hooks/usePayments";
@@ -155,7 +156,7 @@ export default function Collection() {
 
       {/* Tabs */}
       <Tabs defaultValue="manifest" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-4xl">
           <TabsTrigger value="manifest" className="gap-2">
             <FileText className="h-4 w-4" />
             Manifest
@@ -171,6 +172,10 @@ export default function Collection() {
           <TabsTrigger value="profit" className="gap-2">
             <TrendingUp className="h-4 w-4" />
             Keuntungan Harian
+          </TabsTrigger>
+          <TabsTrigger value="collector" className="gap-2">
+            <Users className="h-4 w-4" />
+            Performa Kolektor
           </TabsTrigger>
         </TabsList>
 
@@ -329,6 +334,10 @@ export default function Collection() {
 
         <TabsContent value="profit" className="mt-6">
           <DailyProfitList />
+        </TabsContent>
+
+        <TabsContent value="collector" className="mt-6">
+          <CollectorDailyPerformance />
         </TabsContent>
       </Tabs>
     </div>
