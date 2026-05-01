@@ -62,7 +62,6 @@ export default function SalesAgents() {
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
   const { data: agentOmsetData } = useAgentOmset();
-  const { data: agentCustomerCounts } = useAgentCustomerCounts();
   
   // Get URL parameters
   const periodParam = searchParams.get('period') || 'monthly';
@@ -77,6 +76,18 @@ export default function SalesAgents() {
   const selectedMonthForHook = new Date(effectiveMonth);
   const selectedYearForHook = new Date(Number(effectiveYear), 0, 1);
 
+  // Period range (yyyy-MM-dd) untuk filter pelanggan baru/lama agar selaras dengan periode
+  const periodRange = (() => {
+    if (periodParam === 'yearly') {
+      const y = Number(effectiveYear);
+      return { start: `${y}-01-01`, end: `${y}-12-31` };
+    }
+    const start = format(startOfMonth(selectedMonthForHook), 'yyyy-MM-dd');
+    const end = format(new Date(selectedMonthForHook.getFullYear(), selectedMonthForHook.getMonth() + 1, 0), 'yyyy-MM-dd');
+    return { start, end };
+  })();
+
+  const { data: agentCustomerCounts } = useAgentCustomerCounts(periodRange.start, periodRange.end);
   const { data: monthlyData } = useMonthlyPerformance(selectedMonthForHook);
   const { data: yearlyFinancial } = useYearlyFinancialSummary(selectedYearForHook as Date);
   const { data: commissionTiers } = useCommissionTiers();
