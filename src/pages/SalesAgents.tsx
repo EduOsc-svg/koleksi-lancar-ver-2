@@ -651,8 +651,8 @@ export default function SalesAgents() {
         </div>
         <p className="text-xs text-muted-foreground ml-auto">
           {periodParam === 'monthly'
-            ? 'Omset & komisi sales otomatis reset setiap tanggal 1'
-            : 'Akumulasi sepanjang tahun yang dipilih'}
+            ? 'Omset, komisi & jumlah pelanggan baru/lama mengikuti bulan terpilih (reset tiap tgl 1)'
+            : 'Akumulasi omset, komisi & pelanggan sepanjang tahun yang dipilih'}
         </p>
       </div>
 
