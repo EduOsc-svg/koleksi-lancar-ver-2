@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { FileText, CreditCard, AlertCircle, TrendingUp, Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
@@ -24,19 +25,22 @@ import { addToQueue } from "@/lib/offlineQueue";
 import { notifyQueueUpdated } from "@/hooks/useOfflineQueue";
 import { exportPaymentInputToExcel } from "@/lib/exportPaymentInput";
 import { exportPaymentPerSalesExcel } from "@/lib/exportPaymentPerSales";
+import { exportHandoverPerCollectorDaily } from "@/lib/exportHandoverPerCollectorDaily";
+import { exportPaymentPerCollectorDaily } from "@/lib/exportPaymentPerCollectorDaily";
 
 export default function Collection() {
   const { data: collectors } = useCollectors();
   const { data: contracts, isLoading: contractsLoading } = useContracts("active");
   const { data: salesAgents } = useSalesAgents();
-  const { data: payments, isLoading: paymentsLoading } = usePayments();
+  const { data: payments, isLoading: paymentsLoading } = usePayments(selectedDate, selectedDate);
   const createPayment = useCreatePayment();
   const createBulkPayment = useCreateBulkPayment();
   const createHandover = useCreateCouponHandover();
-  const { data: handovers, isLoading: handoversLoading } = useCouponHandovers();
+  const { data: handovers, isLoading: handoversLoading } = useCouponHandovers(selectedDate);
 
   // Manifest state
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   // Selected contract id for payment form (lifted state to allow selection from search results)
   const [paymentSelectedContract, setPaymentSelectedContract] = useState("");
   // Sort states per tab
@@ -219,45 +223,75 @@ export default function Collection() {
         </TabsContent>
 
         <TabsContent value="payment" className="mt-6">
-          <div className="flex justify-end gap-2 mb-4">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                if (!payments || payments.length === 0) {
-                  toast.error("Tidak ada data pembayaran untuk diexport");
-                  return;
-                }
-                try {
-                  exportPaymentPerSalesExcel(payments, contracts || [], salesAgents || []);
-                  toast.success("Export pembayaran per sales berhasil");
-                } catch (error) {
-                  toast.error("Gagal export pembayaran per sales");
-                  console.error(error);
-                }
-              }}
-              disabled={paymentsLoading}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export Per Sales
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                if (!payments || payments.length === 0) {
-                  toast.error("Tidak ada data pembayaran untuk diexport");
-                  return;
-                }
-                try {
-                  exportPaymentInputToExcel(payments, contracts || []);
-                  toast.success("Export pembayaran berhasil");
-                } catch (error) {
-                  toast.error("Gagal export pembayaran");
-                  console.error(error);
-                }
-              }}
-              disabled={paymentsLoading}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export Excel
-            </Button>
+          <div className="flex items-end justify-between gap-4 mb-4">
+            <div className="w-48">
+              <label className="text-sm text-muted-foreground">Pilih Tanggal</label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  if (!payments || payments.length === 0) {
+                    toast.error("Tidak ada data pembayaran untuk diexport");
+                    return;
+                  }
+                  try {
+                    exportPaymentPerCollectorDaily(payments, contracts || [], selectedDate);
+                    toast.success("Export pembayaran per kolektor berhasil");
+                  } catch (error) {
+                    toast.error("Gagal export pembayaran per kolektor");
+                    console.error(error);
+                  }
+                }}
+                disabled={paymentsLoading}
+              >
+                <Download className="mr-2 h-4 w-4" /> Export Per Kolektor
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  if (!payments || payments.length === 0) {
+                    toast.error("Tidak ada data pembayaran untuk diexport");
+                    return;
+                  }
+                  try {
+                    exportPaymentPerSalesExcel(payments, contracts || [], salesAgents || []);
+                    toast.success("Export pembayaran per sales berhasil");
+                  } catch (error) {
+                    toast.error("Gagal export pembayaran per sales");
+                    console.error(error);
+                  }
+                }}
+                disabled={paymentsLoading}
+              >
+                <Download className="mr-2 h-4 w-4" /> Export Per Sales (Legacy)
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  if (!payments || payments.length === 0) {
+                    toast.error("Tidak ada data pembayaran untuk diexport");
+                    return;
+                  }
+                  try {
+                    exportPaymentInputToExcel(payments, contracts || []);
+                    toast.success("Export pembayaran berhasil");
+                  } catch (error) {
+                    toast.error("Gagal export pembayaran");
+                    console.error(error);
+                  }
+                }}
+                disabled={paymentsLoading}
+              >
+                <Download className="mr-2 h-4 w-4" /> Export Excel
+              </Button>
+            </div>
           </div>
           <DailyDueList />
         </TabsContent>
@@ -272,7 +306,45 @@ export default function Collection() {
             }}
             isSubmitting={createHandover.isPending}
           />
-          <div className="flex items-center justify-end gap-3 mb-3">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-48">
+                <label className="text-sm text-muted-foreground">Pilih Tanggal</label>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!handovers || handovers.length === 0) {
+                    toast.error("Tidak ada data serah terima untuk diexport");
+                    return;
+                  }
+                  try {
+                    const enriched = (handovers || []).map((h: any) => {
+                      const currentIndex = h.credit_contracts?.current_installment_index || 0;
+                      const paidInRange = Math.max(0, Math.min(currentIndex, h.end_index) - h.start_index + 1);
+                      const unpaidInRange = h.coupon_count - Math.max(0, paidInRange);
+                      const daily = h.credit_contracts?.daily_installment_amount || 0;
+                      return { ...h, _paidInRange: paidInRange, _unpaidInRange: unpaidInRange, _unpaidAmount: unpaidInRange * daily };
+                    });
+                    exportHandoverPerCollectorDaily(enriched as any, selectedDate);
+                    toast.success("Export serah terima per kolektor berhasil");
+                  } catch (error) {
+                    toast.error("Gagal export serah terima per kolektor");
+                    console.error(error);
+                  }
+                }}
+                disabled={handoversLoading}
+                className="mt-6"
+              >
+                <Download className="mr-2 h-4 w-4" /> Export Per Kolektor
+              </Button>
+            </div>
             <div className="w-56">
               <label className="text-sm text-muted-foreground">Urutkan</label>
               <Select value={outstandingSort} onValueChange={(v) => setOutstandingSort(v)}>

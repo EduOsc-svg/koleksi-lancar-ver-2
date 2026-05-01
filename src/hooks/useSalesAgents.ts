@@ -10,6 +10,9 @@ export interface SalesAgent {
   phone: string | null;
   commission_percentage: number | null;
   use_tiered_commission: boolean;
+  monthly_omset: number;
+  monthly_commission: number;
+  last_monthly_reset: string | null;
   created_at: string;
 }
 

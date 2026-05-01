@@ -23,14 +23,22 @@ export interface CouponHandover {
   } | null;
 }
 
-export const useCouponHandovers = () => {
+export const useCouponHandovers = (date?: string) => {
   return useQuery({
-    queryKey: ['coupon_handovers'],
+    queryKey: ['coupon_handovers', date],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('coupon_handovers')
-        .select('*, collectors(name, collector_code), credit_contracts(contract_ref, daily_installment_amount, current_installment_index, tenor_days, status, customers(name), sales_agents(agent_code))')
-        .order('created_at', { ascending: false });
+        .select('*, collectors(name, collector_code), credit_contracts(contract_ref, daily_installment_amount, current_installment_index, tenor_days, status, customers(name), sales_agents(agent_code))');
+      
+      if (date) {
+        // Filter by handover_date matching the provided date (YYYY-MM-DD)
+        query = query.eq('handover_date', date);
+      }
+      
+      query = query.order('created_at', { ascending: false });
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as CouponHandover[];
     },

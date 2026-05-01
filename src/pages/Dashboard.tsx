@@ -593,8 +593,8 @@ export default function Dashboard() {
             <Skeleton className="h-[400px] w-full" />
           ) : (
             <>
-              {/* Summary Cards - Using StatCard like monthly */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              {/* Summary Cards - Using StatCard like monthly (responsive 4 columns => 2 rows on wide screens) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                   icon={DollarSign}
                   iconColor="text-blue-500"

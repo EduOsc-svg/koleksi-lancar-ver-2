@@ -33,6 +33,7 @@ interface StatCardProps {
   isPercentage?: boolean;
   isNegative?: boolean;
   hoverInfo?: string;
+  showDetailAlways?: boolean;
   onDetailClick?: () => void;
 }
 
@@ -46,6 +47,7 @@ export function StatCard({
   isPercentage = false,
   isNegative = false,
   hoverInfo,
+  showDetailAlways = false,
   onDetailClick,
 }: StatCardProps) {
   const displayValue = isPercentage 
@@ -68,7 +70,7 @@ export function StatCard({
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+              className={`h-6 px-2 text-xs transition-opacity ${showDetailAlways ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
               onClick={onDetailClick}
             >
               Detail

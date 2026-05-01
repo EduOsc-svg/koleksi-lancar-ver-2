@@ -63,13 +63,19 @@ export default function SalesAgents() {
   const { data: agents, isLoading } = useSalesAgents();
   const { data: agentOmsetData } = useAgentOmset();
   const { data: agentCustomerCounts } = useAgentCustomerCounts();
+  
+  // Get URL parameters
   const periodParam = searchParams.get('period') || 'monthly';
-  const monthParam = searchParams.get('month'); // optional yyyy-MM or yyyy-MM-dd
+  const monthParam = searchParams.get('month');
   const yearParam = searchParams.get('year');
+  
+  // Compute effective values (defaults for missing params)
+  const effectiveMonth = monthParam || format(startOfMonth(new Date()), 'yyyy-MM');
+  const effectiveYear = yearParam || String(new Date().getFullYear());
 
   // resolve month/year for hooks
-  const selectedMonthForHook = monthParam ? new Date(monthParam) : new Date();
-  const selectedYearForHook = yearParam ? new Date(Number(yearParam), 0, 1) : new Date();
+  const selectedMonthForHook = new Date(effectiveMonth);
+  const selectedYearForHook = new Date(Number(effectiveYear), 0, 1);
 
   const { data: monthlyData } = useMonthlyPerformance(selectedMonthForHook);
   const { data: yearlyFinancial } = useYearlyFinancialSummary(selectedYearForHook as Date);
@@ -135,6 +141,36 @@ export default function SalesAgents() {
       }
     }
   }, [highlightId, agents, currentPage, goToPage, searchParams, setSearchParams]);
+
+  // Sync URL parameters to ensure period/month/year are always consistent
+  useEffect(() => {
+    const sp = new URLSearchParams(searchParams);
+    let needsUpdate = false;
+
+    // Ensure period is set
+    if (!sp.get('period')) {
+      sp.set('period', 'monthly');
+      needsUpdate = true;
+    }
+
+    // For monthly period, ensure month is set
+    if (sp.get('period') === 'monthly' && !sp.get('month')) {
+      sp.set('month', format(startOfMonth(new Date()), 'yyyy-MM'));
+      sp.delete('year');
+      needsUpdate = true;
+    }
+
+    // For yearly period, ensure year is set
+    if (sp.get('period') === 'yearly' && !sp.get('year')) {
+      sp.set('year', String(new Date().getFullYear()));
+      sp.delete('month');
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      setSearchParams(sp, { replace: true });
+    }
+  }, []);
 
   const handleOpenCreate = () => {
     // Generate next sales agent code based on the most recent pattern
@@ -206,6 +242,12 @@ export default function SalesAgents() {
     }
 
     const lifetime = agentOmsetData?.find((d) => d.agent_id === agentId);
+    const agentData = agents?.find((a) => a.id === agentId);
+
+    // For monthly period, use monthly_omset and monthly_commission from sales_agents table (reset every 1st day)
+    const useMonthlyTracking = periodParam === 'monthly' && agentData;
+    const monthlyOmset = useMonthlyTracking ? (agentData?.monthly_omset || 0) : undefined;
+    const monthlyCommission = useMonthlyTracking ? (agentData?.monthly_commission || 0) : undefined;
 
     // Normalize fields expected by the UI: total_omset, total_commission, commission_percentage, total_contracts
     const normalized: any = {
@@ -213,10 +255,10 @@ export default function SalesAgents() {
       agent_name: undefined,
       agent_code: undefined,
       commission_percentage: periodRecord?.commission_percentage ?? lifetime?.commission_percentage ?? 0,
-      total_omset: periodRecord?.total_omset ?? lifetime?.total_omset ?? 0,
+      total_omset: useMonthlyTracking ? monthlyOmset : (periodRecord?.total_omset ?? lifetime?.total_omset ?? 0),
       total_modal: periodRecord?.total_modal ?? lifetime?.total_modal ?? 0,
       total_contracts: periodRecord?.total_contracts ?? lifetime?.total_contracts ?? 0,
-      total_commission: periodRecord?.total_commission ?? lifetime?.total_commission ?? 0,
+      total_commission: useMonthlyTracking ? monthlyCommission : (periodRecord?.total_commission ?? lifetime?.total_commission ?? 0),
       booked_total_omset: lifetime?.booked_total_omset,
       booked_total_modal: lifetime?.booked_total_modal,
       booked_contracts_count: lifetime?.booked_contracts_count,
@@ -507,7 +549,7 @@ export default function SalesAgents() {
   };
   const shiftMonth = (delta: number) => {
     const sp = new URLSearchParams(searchParams);
-    const base = monthParam ? new Date(monthParam) : new Date();
+    const base = new Date(effectiveMonth);
     const next = delta < 0 ? subMonths(base, Math.abs(delta)) : addMonths(base, delta);
     sp.set('period', 'monthly');
     sp.set('month', format(startOfMonth(next), 'yyyy-MM'));
@@ -516,14 +558,14 @@ export default function SalesAgents() {
   };
   const shiftYear = (delta: number) => {
     const sp = new URLSearchParams(searchParams);
-    const base = yearParam ? Number(yearParam) : new Date().getFullYear();
+    const base = Number(effectiveYear);
     sp.set('period', 'yearly');
     sp.set('year', String(base + delta));
     sp.delete('month');
     setSearchParams(sp, { replace: true });
   };
   const periodLabel = periodParam === 'yearly'
-    ? `Tahun ${yearParam || new Date().getFullYear()}`
+    ? `Tahun ${effectiveYear}`
     : `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
   const omsetColLabel = periodParam === 'yearly' ? 'Omset Tahunan' : 'Omset Bulan Ini';
   const commissionColLabel = periodParam === 'yearly' ? 'Komisi Tahunan' : 'Komisi Bulan Ini';
