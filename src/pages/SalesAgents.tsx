@@ -711,14 +711,19 @@ export default function SalesAgents() {
             ) : (
               paginatedItems.map((agent) => {
                 const omsetData = getAgentOmset(agent.id);
-                // Ensure we show a commission value even if the hook didn't compute it
-                // Period-based omset (reset tiap tgl 1 jika monthly)
+                // Period-based omset (reset tiap tgl 1 jika monthly, akumulasi jika yearly)
                 const displayOmset = omsetData?.total_omset || 0;
-                const fallbackCommission = (() => {
-                  const dynamicPctLocal = commissionTiers && commissionTiers.length > 0
+                // Komisi: gunakan hasil dari hook periode (sudah tier-based & konsisten dengan agregat).
+                // Jika tidak tersedia (mis. agent tanpa kontrak di periode), hitung lokal.
+                const displayCommission = (() => {
+                  if (omsetData?.total_commission && omsetData.total_commission > 0) {
+                    return omsetData.total_commission;
+                  }
+                  if (displayOmset <= 0) return 0;
+                  const pct = commissionTiers && commissionTiers.length > 0
                     ? calculateTieredCommission(displayOmset, commissionTiers)
-                    : Number(agent.commission_percentage) || 0;
-                  return (displayOmset * (Number(dynamicPctLocal) || 0)) / 100;
+                    : 0;
+                  return (displayOmset * pct) / 100;
                 })();
                 return (
                   <TableRow 
@@ -733,7 +738,7 @@ export default function SalesAgents() {
                     <TableCell>{agent.phone || "-"}</TableCell>
                     <TableCell className="font-medium">{formatRupiah(displayOmset)}</TableCell>
                     <TableCell className="font-medium text-primary">
-                      {formatRupiah((omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission)}
+                      {formatRupiah(displayCommission)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
