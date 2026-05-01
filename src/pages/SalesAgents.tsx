@@ -547,10 +547,11 @@ export default function SalesAgents() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Laporan_Sales_Agent_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const periodSlug = periodParam === 'yearly' ? effectiveYear : effectiveMonth;
+    a.download = `Laporan_Sales_Agent_${periodSlug}_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Excel berhasil di-export dengan detail per sales agent!");
+    toast.success(`Excel berhasil di-export untuk periode ${exportPeriodLabel}!`);
   };
 
   // Period control helpers
