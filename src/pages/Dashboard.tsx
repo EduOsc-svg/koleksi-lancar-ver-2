@@ -293,8 +293,9 @@ export default function Dashboard() {
           label="Sisa Tagihan"
           value={monthlyData?.total_to_collect ?? 0}
           valueColor="text-red-600"
-          subtitle="Kupon belum bayar bulan ini"
-          hoverInfo="Total kupon cicilan yang masih belum dibayar dalam bulan ini (jatuh tempo bulan ini, status unpaid)."
+          subtitle="Kontrak baru bulan ini"
+          hoverInfo={`Sisa tagihan dari kontrak yang dibuat bulan ini.\nRumus per kontrak: (Cicilan harian × Tenor) − Total Pembayaran (ALL TIME).\n\nKlik Detail untuk lihat per sales & per kontrak.`}
+          onDetailClick={() => { setOutstandingDetailScope('monthly'); setOutstandingDetailOpen(true); }}
         />
 
         <StatCard
@@ -646,7 +647,8 @@ export default function Dashboard() {
                   value={yearlyFinancial?.total_to_collect ?? 0}
                   valueColor="text-teal-600"
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}`}
+                  hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}\n\nKlik Detail untuk lihat per sales & per kontrak.`}
+                  onDetailClick={() => { setOutstandingDetailScope('yearly'); setOutstandingDetailOpen(true); }}
                 />
 
                 <StatCard
@@ -909,6 +911,15 @@ export default function Dashboard() {
         ? `Detail Kerugian — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
         : `Detail Kerugian — Tahun ${selectedYear.getFullYear()}`}
       data={lossDetailScope === 'monthly' ? returnedLoss : returnedLossYearly}
+    />
+
+    <OutstandingDetailDialog
+      open={outstandingDetailOpen}
+      onOpenChange={setOutstandingDetailOpen}
+      title={outstandingDetailScope === 'monthly'
+        ? `Detail Sisa Tagihan — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
+        : `Detail Sisa Tagihan — Tahun ${selectedYear.getFullYear()}`}
+      data={outstandingDetailScope === 'monthly' ? outstandingMonthly : outstandingYearly}
     />
     </>
   );
