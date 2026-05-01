@@ -45,6 +45,8 @@ import { id as idLocale } from "date-fns/locale";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChart";
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
+import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
+import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -55,6 +57,8 @@ export default function Dashboard() {
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [lossDetailOpen, setLossDetailOpen] = useState(false);
   const [lossDetailScope, setLossDetailScope] = useState<'monthly' | 'yearly'>('monthly');
+  const [outstandingDetailOpen, setOutstandingDetailOpen] = useState(false);
+  const [outstandingDetailScope, setOutstandingDetailScope] = useState<'monthly' | 'yearly'>('monthly');
   const [newExpense, setNewExpense] = useState<OperationalExpenseInput>({
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
@@ -73,6 +77,8 @@ export default function Dashboard() {
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
   const { data: macetSummary } = useMacetSummary(selectedMonth);
   const { data: macetSummaryYearly } = useMacetSummaryYearly(selectedYear);
+  const { data: outstandingMonthly } = useOutstandingDetailsMonthly(selectedMonth);
+  const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   
   // Pagination for sales agent performance table
