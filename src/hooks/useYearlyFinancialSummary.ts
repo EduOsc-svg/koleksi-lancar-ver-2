@@ -234,22 +234,28 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         if (md) md.collected += amt;
       });
 
-      // Hitung komisi per bulan per agen berdasarkan omset (full kontrak) bulan tersebut
+      // Hitung komisi TAHUNAN per agen berdasarkan TOTAL OMSET TAHUNAN (tier progresif)
+      // Lalu alokasikan secara proporsional ke tiap bulan berdasarkan share omset bulan itu.
+      // Ini membuat komisi konsisten: komisi_tahunan = tier(omset_tahunan) × omset_tahunan
       let totalCommission = 0;
       const agentYearlyCommission = new Map<string, number>();
       const agentMonthlyCommission = new Map<string, Map<string, number>>();
 
-      months.forEach((monthDate) => {
-        const monthKey = format(monthDate, 'yyyy-MM');
-        const agentMonth = monthlyAgentOmset.get(monthKey)!;
-        agentMonth.forEach((omsetMonth, agentId) => {
-          const commissionPct = omsetMonth > 0 ? calculateTieredCommission(omsetMonth, tiers) : 0;
-          const commissionForMonth = (omsetMonth * commissionPct) / 100;
-          if (!agentMonthlyCommission.has(agentId)) agentMonthlyCommission.set(agentId, new Map());
-          agentMonthlyCommission.get(agentId)!.set(monthKey, commissionForMonth);
-          agentYearlyCommission.set(agentId, (agentYearlyCommission.get(agentId) || 0) + commissionForMonth);
-          totalCommission += commissionForMonth;
+      agentYearlyOmset.forEach((omsetYear, agentId) => {
+        const commissionPct = omsetYear > 0 ? calculateTieredCommission(omsetYear, tiers) : 0;
+        const commissionYear = (omsetYear * commissionPct) / 100;
+        agentYearlyCommission.set(agentId, commissionYear);
+        totalCommission += commissionYear;
+
+        // Alokasi proporsional ke bulan
+        const monthMap = new Map<string, number>();
+        months.forEach((monthDate) => {
+          const monthKey = format(monthDate, 'yyyy-MM');
+          const agentMonthOmset = monthlyAgentOmset.get(monthKey)?.get(agentId) || 0;
+          const share = omsetYear > 0 ? agentMonthOmset / omsetYear : 0;
+          monthMap.set(monthKey, commissionYear * share);
         });
+        agentMonthlyCommission.set(agentId, monthMap);
       });
 
       // Alokasi komisi ke bulan & ke kontrak by share

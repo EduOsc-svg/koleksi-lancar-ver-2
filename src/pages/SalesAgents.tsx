@@ -321,14 +321,24 @@ export default function SalesAgents() {
       return;
     }
 
-    // Fetch all contracts + payments for cash-basis realisation per kontrak
+    // Tentukan range tanggal sesuai periode aktif untuk filter kontrak di sheet detail
+    const exportPeriodLabel = periodParam === 'yearly'
+      ? `Tahun ${effectiveYear}`
+      : format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale });
+    const exportStartDate = periodRange.start;
+    const exportEndDate = periodRange.end;
+
+    // Fetch kontrak SESUAI PERIODE + payments untuk cash-basis realisation
     const [
       { data: allContracts, error: contractsError },
       { data: allPayments, error: paymentsError },
     ] = await Promise.all([
       supabase
         .from('credit_contracts')
-        .select('id, contract_ref, product_type, omset, total_loan_amount, start_date, sales_agent_id, customers(name, phone)')
+        .select('id, contract_ref, product_type, omset, total_loan_amount, start_date, sales_agent_id, status, customers(name, phone)')
+        .neq('status', 'returned')
+        .gte('start_date', exportStartDate)
+        .lte('start_date', exportEndDate)
         .order('start_date', { ascending: false }),
       supabase.from('payment_logs').select('amount_paid, contract_id'),
     ]);
@@ -353,18 +363,16 @@ export default function SalesAgents() {
       left: { style: 'thin' }, right: { style: 'thin' },
     };
 
-    // ===== SHEET 1: Semua Sales =====
-    // Kolom dihapus per request user: Kode Sales (juga tanggal/kolektor/kode kolektor/status/sisa - tidak relevan di sheet ini)
-    // Komisi hanya ditampilkan untuk yang 0.8% (bonus tahunan), tanpa SUM kolom komisi
-    const HEADERS_1 = ['No', 'Nama', 'Telepon', 'Komisi % (Dinamis)', 'Total Omset', 'Komisi (0.8% Tahunan)', 'Jumlah Kontrak'];
-    const COL_WIDTHS_1 = [5, 22, 18, 20, 22, 25, 16];
+    // ===== SHEET 1: Semua Sales (PERIODE AKTIF) =====
+    const HEADERS_1 = ['No', 'Nama', 'Telepon', 'Komisi % (Tier)', 'Total Omset', 'Total Komisi', 'Jumlah Kontrak'];
+    const COL_WIDTHS_1 = [5, 22, 18, 20, 22, 22, 16];
 
     const ws1 = workbook.addWorksheet('Semua Sales');
 
     // Title row
     ws1.mergeCells('A1:G1');
     const titleCell = ws1.getCell('A1');
-    titleCell.value = 'LAPORAN PERFORMA SALES AGENT TAHUNAN';
+    titleCell.value = `LAPORAN PERFORMA SALES AGENT - ${exportPeriodLabel.toUpperCase()}`;
     titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
     titleCell.alignment = { horizontal: 'center' };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
@@ -372,7 +380,7 @@ export default function SalesAgents() {
     // Date row
     ws1.mergeCells('A2:G2');
     const dateCell = ws1.getCell('A2');
-    dateCell.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+    dateCell.value = `Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Periode: ${exportPeriodLabel}`;
     dateCell.font = { italic: true, size: 12 };
     dateCell.alignment = { horizontal: 'center' };
 
@@ -390,22 +398,23 @@ export default function SalesAgents() {
     const startRow1 = hRow1.number + 1;
 
     agents.forEach((agent, i) => {
-      const rowNum = startRow1 + i;
       const omsetData = getAgentOmset(agent.id);
-      // Use booked omset if available so commission follows displayed omset
-      const displayOmset = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
-      const dynamicPct = calculateTieredCommission(displayOmset, commissionTiers) / 100;
-      // Bonus tahunan 0.8% hanya untuk kolom komisi
-      const yearlyBonusComission = displayOmset * 0.008; // 0.8%
+      // SELALU pakai data periode aktif (bukan lifetime) — konsisten dengan tabel UI
+      const displayOmset = omsetData?.total_omset || 0;
+      const dynamicPct = displayOmset > 0
+        ? calculateTieredCommission(displayOmset, commissionTiers) / 100
+        : 0;
+      const commissionAmount = (omsetData?.total_commission && omsetData.total_commission > 0)
+        ? omsetData.total_commission
+        : displayOmset * dynamicPct;
 
-      // Layout baru: No | Nama | Telepon | Komisi % | Omset | Komisi 0.8% | Jumlah Kontrak
       const dataRow = ws1.addRow([
         i + 1,
         agent.name,
         agent.phone || '-',
         dynamicPct,
         displayOmset,
-        yearlyBonusComission,
+        commissionAmount,
         omsetData?.total_contracts || 0,
       ]);
 
@@ -465,14 +474,14 @@ export default function SalesAgents() {
       // Title
       sheet.mergeCells('A1:F1');
       const t1 = sheet.getCell('A1');
-      t1.value = `LAPORAN DETAIL - ${agent.name.toUpperCase()} (${agent.agent_code})`;
+      t1.value = `LAPORAN DETAIL - ${agent.name.toUpperCase()} (${agent.agent_code}) - ${exportPeriodLabel.toUpperCase()}`;
       t1.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
       t1.alignment = { horizontal: 'center' };
       t1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       sheet.mergeCells('A2:F2');
       const d1 = sheet.getCell('A2');
-      d1.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} (Cash Basis)`;
+      d1.value = `Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Periode: ${exportPeriodLabel}`;
       d1.font = { italic: true, size: 12 };
       d1.alignment = { horizontal: 'center' };
 
@@ -538,10 +547,11 @@ export default function SalesAgents() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Laporan_Sales_Agent_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const periodSlug = periodParam === 'yearly' ? effectiveYear : effectiveMonth;
+    a.download = `Laporan_Sales_Agent_${periodSlug}_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Excel berhasil di-export dengan detail per sales agent!");
+    toast.success(`Excel berhasil di-export untuk periode ${exportPeriodLabel}!`);
   };
 
   // Period control helpers
@@ -701,14 +711,19 @@ export default function SalesAgents() {
             ) : (
               paginatedItems.map((agent) => {
                 const omsetData = getAgentOmset(agent.id);
-                // Ensure we show a commission value even if the hook didn't compute it
-                // Period-based omset (reset tiap tgl 1 jika monthly)
+                // Period-based omset (reset tiap tgl 1 jika monthly, akumulasi jika yearly)
                 const displayOmset = omsetData?.total_omset || 0;
-                const fallbackCommission = (() => {
-                  const dynamicPctLocal = commissionTiers && commissionTiers.length > 0
+                // Komisi: gunakan hasil dari hook periode (sudah tier-based & konsisten dengan agregat).
+                // Jika tidak tersedia (mis. agent tanpa kontrak di periode), hitung lokal.
+                const displayCommission = (() => {
+                  if (omsetData?.total_commission && omsetData.total_commission > 0) {
+                    return omsetData.total_commission;
+                  }
+                  if (displayOmset <= 0) return 0;
+                  const pct = commissionTiers && commissionTiers.length > 0
                     ? calculateTieredCommission(displayOmset, commissionTiers)
-                    : Number(agent.commission_percentage) || 0;
-                  return (displayOmset * (Number(dynamicPctLocal) || 0)) / 100;
+                    : 0;
+                  return (displayOmset * pct) / 100;
                 })();
                 return (
                   <TableRow 
@@ -723,7 +738,7 @@ export default function SalesAgents() {
                     <TableCell>{agent.phone || "-"}</TableCell>
                     <TableCell className="font-medium">{formatRupiah(displayOmset)}</TableCell>
                     <TableCell className="font-medium text-primary">
-                      {formatRupiah((omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission)}
+                      {formatRupiah(displayCommission)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
