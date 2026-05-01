@@ -624,8 +624,8 @@ export default function SalesAgents() {
               <TableHead>{t("salesAgents.agentCode")}</TableHead>
               <TableHead>{t("salesAgents.name")}</TableHead>
               <TableHead>{t("salesAgents.phone")}</TableHead>
-              <TableHead>{t("salesAgents.totalOmset", "Total Omset")}</TableHead>
-              <TableHead>{t("salesAgents.earnings", "Komisi")}</TableHead>
+              <TableHead>{omsetColLabel}</TableHead>
+              <TableHead>{commissionColLabel}</TableHead>
               <TableHead className="text-center" title="Pelanggan Baru (hanya 1 kontrak)">B</TableHead>
               <TableHead className="text-center" title="Pelanggan Lama (≥2 kontrak)">L</TableHead>
               <TableHead className="text-right">{t("common.actions")}</TableHead>
@@ -646,14 +646,13 @@ export default function SalesAgents() {
               paginatedItems.map((agent) => {
                 const omsetData = getAgentOmset(agent.id);
                 // Ensure we show a commission value even if the hook didn't compute it
+                // Period-based omset (reset tiap tgl 1 jika monthly)
+                const displayOmset = omsetData?.total_omset || 0;
                 const fallbackCommission = (() => {
-                  const displayOmsetLocal = (omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0;
-                  // Try tiered commission first (if tiers present), otherwise use agent fixed pct
                   const dynamicPctLocal = commissionTiers && commissionTiers.length > 0
-                    ? calculateTieredCommission(displayOmsetLocal, commissionTiers)
+                    ? calculateTieredCommission(displayOmset, commissionTiers)
                     : Number(agent.commission_percentage) || 0;
-                  const computed = (displayOmsetLocal * (Number(dynamicPctLocal) || 0)) / 100;
-                  return computed;
+                  return (displayOmset * (Number(dynamicPctLocal) || 0)) / 100;
                 })();
                 return (
                   <TableRow 
@@ -666,9 +665,9 @@ export default function SalesAgents() {
                     <TableCell className="font-medium">{agent.agent_code}</TableCell>
                     <TableCell>{agent.name}</TableCell>
                     <TableCell>{agent.phone || "-"}</TableCell>
-                    <TableCell className="font-medium">{formatRupiah((omsetData?.booked_total_omset ?? omsetData?.total_omset) || 0)}</TableCell>
+                    <TableCell className="font-medium">{formatRupiah(displayOmset)}</TableCell>
                     <TableCell className="font-medium text-primary">
-                      {formatRupiah( (omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission )}
+                      {formatRupiah((omsetData?.total_commission && omsetData.total_commission > 0) ? omsetData.total_commission : fallbackCommission)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-green-600 hover:bg-green-600/90 text-white" title="Pelanggan Baru">
