@@ -32,10 +32,10 @@ interface CollectorDailySummary {
 }
 
 const HEADERS = [
-  'No', 'Kolektor', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Sisa Kupon', 'Angsuran/Kupon (Rp)', 'Total Sisa (Rp)'
+  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Sisa Kupon', 'Angsuran/Kupon (Rp)', 'Total Sisa (Rp)'
 ];
 
-const COL_WIDTHS = [5, 20, 30, 16, 14, 12, 18, 18];
+const COL_WIDTHS = [5, 30, 16, 14, 12, 18, 18];
 
 export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandover[], selectedDate: string) => {
   const workbook = new ExcelJS.Workbook();
@@ -172,23 +172,22 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
       const dailyAmount = h.credit_contracts?.daily_installment_amount || 0;
       const rowValues = [
         idx + 1,
-        collector_name,
         h.credit_contracts?.customers?.name || '-',
         h.credit_contracts?.contract_ref || '-',
         `${h.start_index}-${h.end_index}`,
         h.coupon_count,
         dailyAmount,
-        { formula: `F${rowNum}*G${rowNum}` }, // Total Sisa = Kupon * Angsuran
+        { formula: `E${rowNum}*F${rowNum}` }, // Total Sisa = Kupon * Angsuran
       ];
 
       const row = sheet.addRow(rowValues);
       row.eachCell((cell, colNum) => {
         cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-        if ([6].includes(colNum)) {
+        if ([5].includes(colNum)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
-        } else if ([7, 8].includes(colNum)) {
+        } else if ([6, 7].includes(colNum)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
         } else if (colNum === 1) {
@@ -200,10 +199,10 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     // Subtotal row
     const subtotalRowNum = startRow + collectorHandovers.length;
     const subtotalRowValues = [
-      '', '', '', 'TOTAL:', '', 
-      { formula: `SUM(F${startRow}:F${subtotalRowNum - 1})` },
+      '', '', 'TOTAL:', '', 
+      { formula: `SUM(E${startRow}:E${subtotalRowNum - 1})` },
       '',
-      { formula: `SUM(H${startRow}:H${subtotalRowNum - 1})` },
+      { formula: `SUM(G${startRow}:G${subtotalRowNum - 1})` },
     ];
 
     const subtotalRow = sheet.addRow(subtotalRowValues);
@@ -212,13 +211,13 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-      if ([5, 6].includes(colNum)) {
+      if ([5].includes(colNum)) {
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'right' };
-      } else if ([8].includes(colNum)) {
+      } else if ([6, 7].includes(colNum)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
-      } else if (colNum === 4) {
+      } else if (colNum === 3) {
         cell.alignment = { horizontal: 'right' };
       }
     });

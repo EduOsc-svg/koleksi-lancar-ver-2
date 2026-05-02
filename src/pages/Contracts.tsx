@@ -123,6 +123,9 @@ export default function Contracts() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "return" | null>(null);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
@@ -307,6 +310,64 @@ export default function Contracts() {
     return Math.ceil(amount / tenor);
   };
 
+  const verifyPassword = async (password: string): Promise<boolean> => {
+    try {
+      // Get current user email
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser?.email) {
+        console.error('No authenticated user found');
+        return false;
+      }
+
+      // Try to re-authenticate with current user email and provided password
+      const { error } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: password,
+      });
+      
+      if (error) {
+        console.error('Password verification error:', error.message);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Password verification error:', error);
+      return false;
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!passwordInput.trim()) {
+      toast.error("Password harus diisi");
+      return;
+    }
+
+    try {
+      const isValid = await verifyPassword(passwordInput);
+      if (!isValid) {
+        toast.error("Password salah");
+        setPasswordInput("");
+        return;
+      }
+
+      // Password benar, lanjutkan dengan action yang pending
+      setPasswordDialogOpen(false);
+      setPasswordInput("");
+
+      if (pendingAction === "update") {
+        await executeContractUpdate();
+      } else if (pendingAction === "delete") {
+        await executeContractDelete();
+      } else if (pendingAction === "return") {
+        await executeContractReturn();
+      }
+    } catch (error) {
+      console.error('Password verification error:', error);
+      toast.error("Gagal verifikasi password");
+    }
+  };
+
   const handleSubmit = async () => {
     // Validation for customer (required for both create and update)
     if (!formData.customer_id) {
@@ -349,6 +410,13 @@ export default function Contracts() {
         return;
       }
     }
+
+    // Validasi selesai, tampilkan password dialog
+    setPendingAction("update");
+    setPasswordDialogOpen(true);
+  };
+
+  const executeContractUpdate = async () => {
     try {
       const dailyAmount = formData.daily_installment_amount || calculateInstallment();
       const tenorDays = parseInt(formData.tenor_days) || 100;
@@ -545,7 +613,13 @@ export default function Contracts() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    if (!selectedContract) return;
+    setPendingAction("delete");
+    setPasswordDialogOpen(true);
+  };
+
+  const executeContractDelete = async () => {
     if (!selectedContract) return;
     try {
       await deleteContract.mutateAsync(selectedContract.id);
@@ -559,7 +633,13 @@ export default function Contracts() {
     }
   };
 
-  const handleReturn = async () => {
+  const handleReturnClick = () => {
+    if (!selectedContract) return;
+    setPendingAction("return");
+    setPasswordDialogOpen(true);
+  };
+
+  const executeContractReturn = async () => {
     if (!selectedContract) return;
     try {
       // Tandai kontrak sebagai returned (macet permanen)
@@ -1437,7 +1517,7 @@ export default function Contracts() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Hapus</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteClick}>Hapus</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1461,12 +1541,51 @@ export default function Contracts() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReturn} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleReturnClick} className="bg-destructive hover:bg-destructive/90">
               Ya, Return Kontrak
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password Confirmation Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Konfirmasi Password</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Masukkan password admin untuk melanjutkan operasi ini
+            </p>
+            <Input
+              type="password"
+              placeholder="Masukkan password..."
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+              autoFocus
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setPasswordDialogOpen(false);
+                setPasswordInput("");
+                setPendingAction(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button onClick={handlePasswordSubmit}>
+              Verifikasi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

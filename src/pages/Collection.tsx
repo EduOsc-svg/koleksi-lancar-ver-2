@@ -23,8 +23,6 @@ import { OutstandingCouponsTable } from "@/components/collection/OutstandingCoup
 import { HandoverCouponForm } from "@/components/collection/HandoverCouponForm";
 import { addToQueue } from "@/lib/offlineQueue";
 import { notifyQueueUpdated } from "@/hooks/useOfflineQueue";
-import { exportPaymentInputToExcel } from "@/lib/exportPaymentInput";
-import { exportPaymentPerSalesExcel } from "@/lib/exportPaymentPerSales";
 import { exportHandoverPerCollectorDaily } from "@/lib/exportHandoverPerCollectorDaily";
 import { exportPaymentPerCollectorDaily } from "@/lib/exportPaymentPerCollectorDaily";
 
@@ -252,44 +250,6 @@ export default function Collection() {
                 disabled={paymentsLoading}
               >
                 <Download className="mr-2 h-4 w-4" /> Export Per Kolektor
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  if (!payments || payments.length === 0) {
-                    toast.error("Tidak ada data pembayaran untuk diexport");
-                    return;
-                  }
-                  try {
-                    exportPaymentPerSalesExcel(payments, contracts || [], salesAgents || []);
-                    toast.success("Export pembayaran per sales berhasil");
-                  } catch (error) {
-                    toast.error("Gagal export pembayaran per sales");
-                    console.error(error);
-                  }
-                }}
-                disabled={paymentsLoading}
-              >
-                <Download className="mr-2 h-4 w-4" /> Export Per Sales (Legacy)
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  if (!payments || payments.length === 0) {
-                    toast.error("Tidak ada data pembayaran untuk diexport");
-                    return;
-                  }
-                  try {
-                    exportPaymentInputToExcel(payments, contracts || []);
-                    toast.success("Export pembayaran berhasil");
-                  } catch (error) {
-                    toast.error("Gagal export pembayaran");
-                    console.error(error);
-                  }
-                }}
-                disabled={paymentsLoading}
-              >
-                <Download className="mr-2 h-4 w-4" /> Export Excel
               </Button>
             </div>
           </div>

@@ -121,7 +121,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
-        supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)'),
+        supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)').neq('status', 'returned').gte('start_date', yearStart).lte('start_date', yearEnd),
         supabase.from('payment_logs').select('amount_paid, payment_date, contract_id').gte('payment_date', yearStart).lte('payment_date', yearEnd),
         supabase.from('payment_logs').select('amount_paid, contract_id'),
         supabase.from('operational_expenses').select('amount, expense_date, description, category').gte('expense_date', yearStart).lte('expense_date', yearEnd),
@@ -173,13 +173,11 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const agentYearlyContracts = new Map<string, Set<string>>();
 
       // Process kontrak: alokasikan FULL ke bulan start_date
+      // Note: Kontrak sudah di-filter di database berdasarkan start_date dan status
       (contracts || []).forEach((contract: any) => {
         if (!contract.start_date) return;
-        // Exclude kontrak yang di-return (macet permanen)
-        if (contract.status === 'returned') return;
-        const startDate = new Date(contract.start_date);
-        if (startDate.getFullYear() !== selectedYear) return;
 
+        const startDate = new Date(contract.start_date);
         const dynamicStatus = calculateContractStatus(contract);
         if (statusFilter !== 'all' && dynamicStatus !== statusFilter) return;
 
@@ -234,40 +232,34 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         if (md) md.collected += amt;
       });
 
-      // Hitung komisi TAHUNAN per agen berdasarkan TOTAL OMSET TAHUNAN (tier progresif)
-      // Lalu alokasikan secara proporsional ke tiap bulan berdasarkan share omset bulan itu.
-      // Ini membuat komisi konsisten: komisi_tahunan = tier(omset_tahunan) × omset_tahunan
+      // Hitung komisi PER AGENT per bulan berdasarkan omset bulan itu (SIMPLE & CONSISTENT)
+      // Ini konsisten dengan monthly: komisi = tier(omset_bulan) × omset_bulan
+      // Total tahunan = sum komisi bulanan (bukan tier(omset_tahunan) yang bisa berbeda)
       let totalCommission = 0;
       const agentYearlyCommission = new Map<string, number>();
-      const agentMonthlyCommission = new Map<string, Map<string, number>>();
 
-      agentYearlyOmset.forEach((omsetYear, agentId) => {
-        const commissionPct = omsetYear > 0 ? calculateTieredCommission(omsetYear, tiers) : 0;
-        const commissionYear = (omsetYear * commissionPct) / 100;
-        agentYearlyCommission.set(agentId, commissionYear);
-        totalCommission += commissionYear;
-
-        // Alokasi proporsional ke bulan
-        const monthMap = new Map<string, number>();
-        months.forEach((monthDate) => {
-          const monthKey = format(monthDate, 'yyyy-MM');
-          const agentMonthOmset = monthlyAgentOmset.get(monthKey)?.get(agentId) || 0;
-          const share = omsetYear > 0 ? agentMonthOmset / omsetYear : 0;
-          monthMap.set(monthKey, commissionYear * share);
-        });
-        agentMonthlyCommission.set(agentId, monthMap);
-      });
-
-      // Alokasi komisi ke bulan & ke kontrak by share
+      // BEST PRACTICE: Calculate commission per agent per month, then sum to yearly
       months.forEach((monthDate) => {
         const monthKey = format(monthDate, 'yyyy-MM');
         const md = monthlyData.get(monthKey)!;
         let monthCommission = 0;
-        agentMonthlyCommission.forEach((monthMap) => {
-          monthCommission += monthMap.get(monthKey) || 0;
+
+        // Per agent dalam bulan ini: hitung komisi dari omset bulan itu
+        monthlyAgentOmset.get(monthKey)?.forEach((agentMonthOmset, agentId) => {
+          if (agentMonthOmset > 0) {
+            const commissionPct = calculateTieredCommission(agentMonthOmset, tiers);
+            const agentMonthCommission = (agentMonthOmset * commissionPct) / 100;
+            monthCommission += agentMonthCommission;
+
+            // Accumulate yearly commission per agent
+            agentYearlyCommission.set(agentId, (agentYearlyCommission.get(agentId) || 0) + agentMonthCommission);
+            totalCommission += agentMonthCommission;
+          }
         });
+
         md.commission = monthCommission;
 
+        // Alokasi komisi ke kontrak per share omset kontrak di bulan itu
         const detailMap = monthlyContractDetails.get(monthKey)!;
         if (md.total_omset > 0) {
           detailMap.forEach((d) => {
@@ -290,17 +282,18 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         if (list) list.push({ description: exp.description, amount, category: exp.category || null });
       });
 
-      // Status counts
+      // Status counts (note: contracts already filtered by DB, so no year check needed)
       let completedCount = 0, activeCount = 0, lancarCount = 0, kurangLancarCount = 0, macetCount = 0;
       let totalContractsCount = 0;
 
       (contracts || []).forEach((contract: any) => {
-        const startYear = new Date(contract.start_date).getFullYear();
-        if (startYear !== selectedYear) return;
+        if (!contract.start_date) return;
         if (contract.status === 'returned') return;
+        totalContractsCount++;
+
         const dynamicStatus = calculateContractStatus(contract);
         if (statusFilter !== 'all' && dynamicStatus !== statusFilter) return;
-        totalContractsCount++;
+
         switch (dynamicStatus) {
           case 'completed': completedCount++; break;
           case 'lancar': lancarCount++; activeCount++; break;
@@ -315,15 +308,14 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         paymentsByContract.set(p.contract_id, (paymentsByContract.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
       });
 
-      // Compute sisa tagihan per contract using daily_installment_amount * tenor_days - paid (ALL TIME)
+      // Compute sisa tagihan per contract (note: contracts already filtered by DB)
+      // Sisa Tagihan = total_loan_amount - total_pembayaran_all_time
       let totalToCollect = 0;
       (contracts || []).forEach((c: any) => {
         if (!c.start_date) return;
-        const startYear = new Date(c.start_date).getFullYear();
-        if (startYear !== selectedYear) return;
         if (c.status === 'returned') return;
 
-        const contractTotal = Number(c.daily_installment_amount || 0) * Number(c.tenor_days || 0);
+        const contractTotal = Number(c.total_loan_amount || 0);
         const paidAmount = paymentsByContract.get(c.id) || 0;
         const sisaKontrak = Math.max(0, contractTotal - paidAmount);
         totalToCollect += sisaKontrak;
@@ -336,12 +328,15 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const expectedTotal = totalToCollect + totalCollected;
       const collectionRate = expectedTotal > 0 ? (totalCollected / expectedTotal) * 100 : 0;
 
-      // Agent results
+      // Agent results - BEST PRACTICE: Include all agents (even with 0 contracts in year)
+      // Sort by total_omset descending
       const agentResults: AgentYearlyPerformance[] = (agents || []).map((agent: any) => {
         const total_omset = agentYearlyOmset.get(agent.id) || 0;
         const total_modal = agentYearlyModal.get(agent.id) || 0;
         const total_commission = agentYearlyCommission.get(agent.id) || 0;
+        const profit = total_omset - total_modal;
         const commissionPct = total_omset > 0 ? calculateTieredCommission(total_omset, tiers) : 0;
+
         return {
           agent_id: agent.id,
           agent_name: agent.name,
@@ -349,11 +344,11 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
           commission_percentage: commissionPct,
           total_modal,
           total_omset,
-          profit: total_omset - total_modal,
+          profit,
           total_commission,
           contracts_count: agentYearlyContracts.get(agent.id)?.size || 0,
         };
-      }).filter(a => a.contracts_count > 0).sort((a, b) => b.total_omset - a.total_omset);
+      }).sort((a, b) => b.total_omset - a.total_omset);
 
       // Monthly details
       const monthlyDetails: MonthlyDetailData[] = months.map(monthDate => {

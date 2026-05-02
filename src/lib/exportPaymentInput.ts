@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { PaymentWithRelations } from '@/hooks/usePayments';
+import type { CouponHandover } from '@/hooks/useCouponHandovers';
 
 interface BulkPaymentSummary {
   contractId: string;
@@ -9,18 +10,46 @@ interface BulkPaymentSummary {
   totalCoupons: number;
   dailyAmount: number;
   totalAmount: number;
+  status: 'unpaid' | 'partial' | 'paid'; // Status tracking
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'Jumlah Pembayaran', 'Jumlah Kupon', 'Angsuran', 'Total Tertagih (Rp)'
+  'No', 'Konsumen', 'Kode Kontrak', 'Jumlah Pembayaran', 'Jumlah Kupon', 'Angsuran', 'Total Tertagih (Rp)', 'Status'
 ];
 
-const COL_WIDTHS = [5, 30, 16, 16, 12, 14, 18];
+const COL_WIDTHS = [5, 30, 16, 16, 12, 14, 18, 12];
 
-export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[], contracts: any[]) => {
+/**
+ * Export pembayaran dengan pencatatan lengkap semua handover (termasuk yang sudah lunas)
+ * @param payments - Data pembayaran yang tercatat
+ * @param contracts - Data kontrak untuk referensi
+ * @param handovers - Semua handover (kupon diserahkan) - optional untuk kompatibilitas
+ * @param selectedDate - Tanggal laporan
+ */
+export const exportPaymentInputToExcel = async (
+  payments: PaymentWithRelations[], 
+  contracts: any[], 
+  handoversOrDate?: any,
+  dateOrUndefined?: string
+) => {
+  // Handle backward compatibility: function dapat dipanggil dengan 2 atau 4 parameter
+  let selectedDate: string | undefined;
+  let handovers: CouponHandover[] = [];
+
+  if (typeof handoversOrDate === 'string') {
+    // Old signature: (payments, contracts, selectedDate)
+    selectedDate = handoversOrDate;
+  } else if (Array.isArray(handoversOrDate)) {
+    // New signature: (payments, contracts, handovers, selectedDate)
+    handovers = handoversOrDate;
+    selectedDate = dateOrUndefined;
+  }
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Management System Kredit';
   workbook.created = new Date();
+
+  // Parse selected date or use today
+  const exportDate = selectedDate ? new Date(selectedDate) : new Date();
 
   // Create main sheet
   const sheet = workbook.addWorksheet('Input Pembayaran');
@@ -36,7 +65,7 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
   // Date info
   sheet.mergeCells('A2:G2');
   const dateCell = sheet.getCell('A2');
-  dateCell.value = `Per tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+  dateCell.value = `Per tanggal: ${exportDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   dateCell.font = { italic: true, size: 12 };
   dateCell.alignment = { horizontal: 'center' };
 
@@ -53,33 +82,72 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
 
   const startRow = hRow.number + 1;
 
-  // Build bulk summary from payments grouped by contract
+  // Build bulk summary dari handovers (jika tersedia) - ini adalah versi lengkap dengan semua data
   const bulkMap = new Map<string, BulkPaymentSummary>();
 
-  payments.forEach((payment) => {
-    const contract = contracts.find(c => c.id === payment.contract_id);
-    const dailyAmount = contract?.daily_installment_amount || 0;
-    const customerName = payment.credit_contracts?.customers?.name || '-';
-    const contractRef = payment.credit_contracts?.contract_ref || '-';
+  // Jika handovers tersedia, gunakan sebagai sumber utama (termasuk yang sudah lunas)
+  if (handovers.length > 0) {
+    handovers.forEach((handover) => {
+      if (!handover.credit_contracts) return;
 
-    const key = payment.contract_id;
-    if (!bulkMap.has(key)) {
-      bulkMap.set(key, {
-        contractId: payment.contract_id,
-        customerName,
-        contractRef,
-        paymentCount: 0,
-        totalCoupons: 0,
-        dailyAmount,
-        totalAmount: 0,
-      });
-    }
+      const key = handover.contract_id;
+      const currentIndex = handover.credit_contracts.current_installment_index || 0;
+      const paidCount = Math.max(0, Math.min(currentIndex, handover.end_index) - handover.start_index + 1);
+      const unpaidCount = handover.coupon_count - paidCount;
+      
+      const dailyAmount = handover.credit_contracts.daily_installment_amount || 0;
+      const totalAmount = dailyAmount * handover.coupon_count;
+      
+      // Tentukan status
+      let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+      if (unpaidCount === 0) {
+        status = 'paid';
+      } else if (paidCount > 0) {
+        status = 'partial';
+      }
 
-    const summary = bulkMap.get(key)!;
-    summary.paymentCount += 1;
-    summary.totalCoupons += 1; // 1 pembayaran = 1 kupon
-    summary.totalAmount += dailyAmount;
-  });
+      if (!bulkMap.has(key)) {
+        bulkMap.set(key, {
+          contractId: handover.contract_id,
+          customerName: handover.credit_contracts.customers?.name || '-',
+          contractRef: handover.credit_contracts.contract_ref,
+          paymentCount: paidCount,
+          totalCoupons: handover.coupon_count,
+          dailyAmount,
+          totalAmount,
+          status,
+        });
+      }
+    });
+  } else {
+    // Fallback: gunakan payments data (versi lama untuk backward compatibility)
+    payments.forEach((payment) => {
+      const contract = contracts.find(c => c.id === payment.contract_id);
+      const dailyAmount = contract?.daily_installment_amount || 0;
+      const customerName = payment.credit_contracts?.customers?.name || '-';
+      const contractRef = payment.credit_contracts?.contract_ref || '-';
+
+      const key = payment.contract_id;
+      if (!bulkMap.has(key)) {
+        bulkMap.set(key, {
+          contractId: payment.contract_id,
+          customerName,
+          contractRef,
+          paymentCount: 0,
+          totalCoupons: 0,
+          dailyAmount,
+          totalAmount: 0,
+          status: 'unpaid',
+        });
+      }
+
+      const summary = bulkMap.get(key)!;
+      summary.paymentCount += 1;
+      summary.totalCoupons += 1; // 1 pembayaran = 1 kupon
+      summary.totalAmount += dailyAmount;
+      summary.status = summary.paymentCount === summary.totalCoupons ? 'paid' : 'partial';
+    });
+  }
 
   // Convert map to array and sort
   const bulkData = Array.from(bulkMap.values()).sort((a, b) => 
@@ -96,6 +164,7 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
       bulk.totalCoupons,
       bulk.dailyAmount,
       bulk.totalAmount,
+      bulk.status.toUpperCase(),
     ];
 
     const dataRow = sheet.addRow(dataRowValues);
@@ -110,6 +179,20 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
       } else if ([6, 7].includes(colNumber)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
+      } else if (colNumber === 8) {
+        // Status column
+        cell.alignment = { horizontal: 'center' };
+        // Color code status
+        if (bulk.status === 'paid') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } }; // Light green
+          cell.font = { color: { argb: 'FF006100' } }; // Dark green
+        } else if (bulk.status === 'partial') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB9C' } }; // Light yellow
+          cell.font = { color: { argb: 'FF9C6500' } }; // Dark orange
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCB' } }; // Light red
+          cell.font = { color: { argb: 'FF9C0006' } }; // Dark red
+        }
       }
     });
   });
@@ -121,6 +204,7 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
       '', '', 'TOTAL', '', '',
       { formula: `SUM(F${startRow}:F${endRow})` },
       { formula: `SUM(G${startRow}:G${endRow})` },
+      '', // Status column empty for total
     ];
 
     const totalRow = sheet.addRow(totalRowValues);
@@ -149,7 +233,7 @@ export const exportPaymentInputToExcel = async (payments: PaymentWithRelations[]
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Input_Pembayaran_${new Date().toISOString().split('T')[0]}.xlsx`;
+  a.download = `Input_Pembayaran_${selectedDate || new Date().toISOString().split('T')[0]}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
 };

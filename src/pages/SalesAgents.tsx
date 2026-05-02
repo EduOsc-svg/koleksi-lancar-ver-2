@@ -47,7 +47,6 @@ import { useAgentOmset } from "@/hooks/useAgentOmset";
 import { useAgentCustomerCounts } from "@/hooks/useAgentCustomerCounts";
 import { Badge } from "@/components/ui/badge";
 import { useMonthlyPerformance } from '@/hooks/useMonthlyPerformance';
-import { useYearlyFinancialSummary } from '@/hooks/useYearlyFinancialSummary';
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
 import { formatRupiah } from "@/lib/format";
@@ -64,24 +63,17 @@ export default function SalesAgents() {
   const { data: agentOmsetData } = useAgentOmset();
   
   // Get URL parameters
-  const periodParam = searchParams.get('period') || 'monthly';
+  const periodParam = 'monthly'; // Always monthly, removed yearly option
   const monthParam = searchParams.get('month');
-  const yearParam = searchParams.get('year');
   
   // Compute effective values (defaults for missing params)
   const effectiveMonth = monthParam || format(startOfMonth(new Date()), 'yyyy-MM');
-  const effectiveYear = yearParam || String(new Date().getFullYear());
 
-  // resolve month/year for hooks
+  // resolve month for hooks
   const selectedMonthForHook = new Date(effectiveMonth);
-  const selectedYearForHook = new Date(Number(effectiveYear), 0, 1);
 
   // Period range (yyyy-MM-dd) untuk filter pelanggan baru/lama agar selaras dengan periode
   const periodRange = (() => {
-    if (periodParam === 'yearly') {
-      const y = Number(effectiveYear);
-      return { start: `${y}-01-01`, end: `${y}-12-31` };
-    }
     const start = format(startOfMonth(selectedMonthForHook), 'yyyy-MM-dd');
     const end = format(new Date(selectedMonthForHook.getFullYear(), selectedMonthForHook.getMonth() + 1, 0), 'yyyy-MM-dd');
     return { start, end };
@@ -89,7 +81,6 @@ export default function SalesAgents() {
 
   const { data: agentCustomerCounts } = useAgentCustomerCounts(periodRange.start, periodRange.end);
   const { data: monthlyData } = useMonthlyPerformance(selectedMonthForHook);
-  const { data: yearlyFinancial } = useYearlyFinancialSummary(selectedYearForHook as Date);
   const { data: commissionTiers } = useCommissionTiers();
   const createAgent = useCreateSalesAgent();
   const updateAgent = useUpdateSalesAgent();
@@ -153,28 +144,26 @@ export default function SalesAgents() {
     }
   }, [highlightId, agents, currentPage, goToPage, searchParams, setSearchParams]);
 
-  // Sync URL parameters to ensure period/month/year are always consistent
+  // Sync URL parameters to ensure month is always consistent
   useEffect(() => {
     const sp = new URLSearchParams(searchParams);
     let needsUpdate = false;
 
-    // Ensure period is set
-    if (!sp.get('period')) {
-      sp.set('period', 'monthly');
+    // Remove period parameter if it exists
+    if (sp.get('period')) {
+      sp.delete('period');
       needsUpdate = true;
     }
 
-    // For monthly period, ensure month is set
-    if (sp.get('period') === 'monthly' && !sp.get('month')) {
-      sp.set('month', format(startOfMonth(new Date()), 'yyyy-MM'));
+    // Remove year parameter if it exists
+    if (sp.get('year')) {
       sp.delete('year');
       needsUpdate = true;
     }
 
-    // For yearly period, ensure year is set
-    if (sp.get('period') === 'yearly' && !sp.get('year')) {
-      sp.set('year', String(new Date().getFullYear()));
-      sp.delete('month');
+    // Ensure month is set
+    if (!sp.get('month')) {
+      sp.set('month', format(startOfMonth(new Date()), 'yyyy-MM'));
       needsUpdate = true;
     }
 
@@ -244,18 +233,15 @@ export default function SalesAgents() {
 
   const getAgentOmset = (agentId: string) => {
     // Period-specific record dari hook yang sudah filter sesuai periode terpilih.
-    // - monthly: monthlyData.agents (kontrak start_date di bulan terpilih)
-    // - yearly:  yearlyFinancial.agents (kontrak start_date di tahun terpilih)
+    // monthly: monthlyData.agents (kontrak start_date di bulan terpilih)
     let periodRecord: any = undefined;
-    if (periodParam === 'monthly' && monthlyData?.agents) {
+    if (monthlyData?.agents) {
       periodRecord = monthlyData.agents.find((a: any) => a.agent_id === agentId || a.agent_code === getAgentCode(agentId));
-    } else if (periodParam === 'yearly' && yearlyFinancial?.agents) {
-      periodRecord = yearlyFinancial.agents.find((a: any) => a.agent_id === agentId || a.agent_code === getAgentCode(agentId));
     }
 
     const lifetime = agentOmsetData?.find((d) => d.agent_id === agentId);
 
-    // Untuk periode bulanan/tahunan, SELALU gunakan periodRecord (akan 0 jika tidak ada kontrak di periode itu).
+    // Untuk periode bulanan, SELALU gunakan periodRecord (akan 0 jika tidak ada kontrak di periode itu).
     // Tidak fallback ke lifetime/monthly_omset rolling agar selaras dengan periode yang dipilih user.
     const total_omset = periodRecord?.total_omset ?? 0;
     const total_commission = periodRecord?.total_commission ?? 0;
@@ -322,9 +308,7 @@ export default function SalesAgents() {
     }
 
     // Tentukan range tanggal sesuai periode aktif untuk filter kontrak di sheet detail
-    const exportPeriodLabel = periodParam === 'yearly'
-      ? `Tahun ${effectiveYear}`
-      : format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale });
+    const exportPeriodLabel = format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale });
     const exportStartDate = periodRange.start;
     const exportEndDate = periodRange.end;
 
@@ -547,7 +531,7 @@ export default function SalesAgents() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const periodSlug = periodParam === 'yearly' ? effectiveYear : effectiveMonth;
+    const periodSlug = effectiveMonth;
     a.download = `Laporan_Sales_Agent_${periodSlug}_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
@@ -555,44 +539,25 @@ export default function SalesAgents() {
   };
 
   // Period control helpers
-  const setPeriod = (p: 'monthly' | 'yearly') => {
+  const shiftMonth = (delta: number | null = null) => {
     const sp = new URLSearchParams(searchParams);
-    sp.set('period', p);
-    if (p === 'monthly') {
-      sp.delete('year');
-      if (!sp.get('month')) sp.set('month', format(startOfMonth(new Date()), 'yyyy-MM'));
+    let targetDate: Date;
+    
+    if (delta === null) {
+      // Navigate to current month (today)
+      targetDate = startOfMonth(new Date());
     } else {
-      sp.delete('month');
-      if (!sp.get('year')) sp.set('year', String(new Date().getFullYear()));
+      // Navigate by delta months
+      const base = new Date(effectiveMonth);
+      targetDate = delta < 0 ? subMonths(base, Math.abs(delta)) : addMonths(base, delta);
     }
+    
+    sp.set('month', format(targetDate, 'yyyy-MM'));
     setSearchParams(sp, { replace: true });
   };
-  const shiftMonth = (delta: number) => {
-    const sp = new URLSearchParams(searchParams);
-    const base = new Date(effectiveMonth);
-    const next = delta < 0 ? subMonths(base, Math.abs(delta)) : addMonths(base, delta);
-    sp.set('period', 'monthly');
-    sp.set('month', format(startOfMonth(next), 'yyyy-MM'));
-    sp.delete('year');
-    setSearchParams(sp, { replace: true });
-  };
-  const shiftYear = (delta: number) => {
-    const sp = new URLSearchParams(searchParams);
-    const base = Number(effectiveYear);
-    sp.set('period', 'yearly');
-    sp.set('year', String(base + delta));
-    sp.delete('month');
-    setSearchParams(sp, { replace: true });
-  };
-  const periodLabel = periodParam === 'yearly'
-    ? `Tahun ${effectiveYear}`
-    : `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
-  const omsetColLabel = periodParam === 'yearly'
-    ? `Omset ${effectiveYear}`
-    : `Omset ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
-  const commissionColLabel = periodParam === 'yearly'
-    ? `Komisi ${effectiveYear}`
-    : `Komisi ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
+  const periodLabel = `${format(selectedMonthForHook, 'MMMM yyyy', { locale: idLocale })} (reset tgl 1)`;
+  const omsetColLabel = `Omset ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
+  const commissionColLabel = `Komisi ${format(selectedMonthForHook, 'MMM yyyy', { locale: idLocale })}`;
 
   return (
     <div className="space-y-6">
@@ -611,75 +576,70 @@ export default function SalesAgents() {
         </div>
       </div>
 
-      {/* Period selector */}
-      <div className="flex flex-wrap items-center gap-3 p-3 border rounded-lg bg-muted/30">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Periode:</span>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant={periodParam === 'monthly' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setPeriod('monthly')}
-          >
-            Bulanan
-          </Button>
-          <Button
-            variant={periodParam === 'yearly' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setPeriod('yearly')}
-          >
-            Tahunan
-          </Button>
-        </div>
-        <div className="flex items-center gap-1 ml-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => periodParam === 'yearly' ? shiftYear(-1) : shiftMonth(-1)}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="font-semibold min-w-[200px] text-center text-sm capitalize">
-            {periodLabel}
+      {/* Filter and Period Selector */}
+      <div className="space-y-4">
+        {/* Period selector card */}
+        <div className="border rounded-lg bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Periode Bulanan</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => shiftMonth(-1)}
+                  title="Bulan sebelumnya"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="font-semibold min-w-[220px] text-center text-sm capitalize px-4 py-2 bg-muted/50 rounded">
+                  {periodLabel}
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => shiftMonth(1)}
+                  title="Bulan berikutnya"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="ml-2"
+                  onClick={() => shiftMonth(null)}
+                >
+                  Bulan Ini
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground text-right hidden md:block">
+                <p>Omset, komisi & pelanggan</p>
+                <p>mengikuti bulan terpilih (reset tiap tgl 1)</p>
+              </div>
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => periodParam === 'yearly' ? shiftYear(1) : shiftMonth(1)}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => periodParam === 'yearly' ? shiftYear(new Date().getFullYear() - (Number(yearParam) || new Date().getFullYear())) : shiftMonth(0)}
-          >
-            {periodParam === 'yearly' ? 'Tahun Ini' : 'Bulan Ini'}
-          </Button>
         </div>
-        <p className="text-xs text-muted-foreground ml-auto">
-          {periodParam === 'monthly'
-            ? 'Omset, komisi & jumlah pelanggan baru/lama mengikuti bulan terpilih (reset tiap tgl 1)'
-            : 'Akumulasi omset, komisi & pelanggan sepanjang tahun yang dipilih'}
-        </p>
-      </div>
 
-      {/* Search Input */}
-      <div className="flex justify-between items-center gap-4">
-        <SearchInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          onClear={() => setSearchQuery("")}
-          placeholder="Cari sales agent berdasarkan nama, kode, atau telepon..."
-          className="max-w-md"
-        />
-        <div className="text-sm text-muted-foreground">
-          {searchQuery
-            ? `Ditemukan ${totalItems} dari ${agents?.length || 0} sales agent`
-            : `Menampilkan ${totalItems} dari ${agents?.length || 0} sales agent`
-          }
+        {/* Search and stats */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onClear={() => setSearchQuery("")}
+            placeholder="Cari berdasarkan nama, kode, atau telepon..."
+            className="flex-1 md:max-w-md"
+          />
+          <div className="text-sm text-muted-foreground">
+            {searchQuery
+              ? `Ditemukan ${totalItems} dari ${agents?.length || 0} sales agent`
+              : `Total ${agents?.length || 0} sales agent`
+            }
+          </div>
         </div>
       </div>
 
@@ -711,9 +671,9 @@ export default function SalesAgents() {
             ) : (
               paginatedItems.map((agent) => {
                 const omsetData = getAgentOmset(agent.id);
-                // Period-based omset (reset tiap tgl 1 jika monthly, akumulasi jika yearly)
+                // Monthly omset (reset tiap tgl 1)
                 const displayOmset = omsetData?.total_omset || 0;
-                // Komisi: gunakan hasil dari hook periode (sudah tier-based & konsisten dengan agregat).
+                // Komisi: gunakan hasil dari hook (sudah tier-based & konsisten dengan agregat).
                 // Jika tidak tersedia (mis. agent tanpa kontrak di periode), hitung lokal.
                 const displayCommission = (() => {
                   if (omsetData?.total_commission && omsetData.total_commission > 0) {
