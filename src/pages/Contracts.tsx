@@ -68,8 +68,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAdminNote } from "@/contexts/AdminNoteContext";
 
 export default function Contracts() {
+  const { promptAdminNote } = useAdminNote();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
   const newCustomerId = searchParams.get('newCustomerId');
