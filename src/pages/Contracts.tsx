@@ -425,7 +425,12 @@ export default function Contracts() {
       const modalEfektif = Math.max(0, (formData.modal || 0) - (formData.dp || 0));
 
       if (selectedContract) {
-        // UPDATE KONTRAK
+        // UPDATE KONTRAK — minta catatan admin
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Kontrak",
+          description: `Tuliskan alasan perubahan kontrak ${selectedContract.contract_ref}.`,
+        });
+        if (!note) return;
         await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
@@ -439,6 +444,7 @@ export default function Contracts() {
           start_date: formData.start_date,
           status: formData.status,
           omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+          _note: note,
         } as any);
         toast.success("Kontrak berhasil diperbarui");
       } else {
@@ -624,7 +630,14 @@ export default function Contracts() {
   const executeContractDelete = async () => {
     if (!selectedContract) return;
     try {
-      await deleteContract.mutateAsync(selectedContract.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Kontrak",
+        description: `Tuliskan alasan menghapus kontrak ${selectedContract.contract_ref}.`,
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteContract.mutateAsync({ id: selectedContract.id, _note: note });
       toast.success("Kontrak berhasil dihapus");
       setDeleteDialogOpen(false);
       setSelectedContract(null);
@@ -645,10 +658,18 @@ export default function Contracts() {
     if (!selectedContract) return;
     try {
       // Tandai kontrak sebagai returned (macet permanen)
+      const note = await promptAdminNote({
+        title: "Catatan Return Kontrak",
+        description: `Tuliskan alasan menandai kontrak ${selectedContract.contract_ref} sebagai Return / Macet.`,
+        confirmLabel: "Tandai Return",
+        variant: "destructive",
+      });
+      if (!note) return;
       await updateContract.mutateAsync({
         id: selectedContract.id,
         status: "returned",
-      });
+        _note: note,
+      } as any);
       // Batalkan kupon yang masih unpaid agar tidak menambah outstanding/sisa tagihan
       const { error: cErr } = await supabase
         .from("installment_coupons")
