@@ -36,7 +36,7 @@ export const useCreateCollector = () => {
   const logActivity = useLogActivity();
   
   return useMutation({
-    mutationFn: async (collector: Omit<Collector, 'id' | 'created_at'>) => {
+    mutationFn: async (collector: Omit<Collector, 'id' | 'created_at' | 'is_active'> & { is_active?: boolean }) => {
       const { data, error } = await supabase
         .from('collectors')
         .insert(collector)
