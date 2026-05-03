@@ -6,6 +6,7 @@ import ExcelJS from "exceljs";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAdminNote } from "@/contexts/AdminNoteContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ import { useCommissionTiers, calculateTieredCommission } from "@/hooks/useCommis
 
 export default function SalesAgents() {
   const { t } = useTranslation();
+  const { promptAdminNote } = useAdminNote();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
@@ -273,7 +275,12 @@ export default function SalesAgents() {
   const handleSubmit = async () => {
     try {
       if (selectedAgent) {
-        await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData });
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Sales",
+          description: `Tuliskan alasan perubahan data sales ${selectedAgent.name}.`,
+        });
+        if (!note) return;
+        await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData, _note: note } as any);
         toast.success(t("success.updated"));
       } else {
         await createAgent.mutateAsync(formData);
@@ -288,7 +295,14 @@ export default function SalesAgents() {
   const handleDelete = async () => {
     if (!selectedAgent) return;
     try {
-      await deleteAgent.mutateAsync(selectedAgent.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Sales",
+        description: `Tuliskan alasan menghapus sales ${selectedAgent.name}.`,
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteAgent.mutateAsync({ id: selectedAgent.id, _note: note });
       toast.success(t("success.deleted"));
       setDeleteDialogOpen(false);
     } catch (error) {
@@ -735,7 +749,15 @@ export default function SalesAgents() {
                         variant="ghost"
                         size="icon"
                         title={agent.is_active === false ? "Aktifkan kembali" : "Tandai tidak bekerja"}
-                        onClick={() => updateAgent.mutate({ id: agent.id, is_active: !(agent.is_active === false ? false : true) } as any)}
+                        onClick={async () => {
+                          const willDeactivate = agent.is_active !== false;
+                          const note = await promptAdminNote({
+                            title: willDeactivate ? "Catatan Nonaktifkan Sales" : "Catatan Aktifkan Sales",
+                            description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} sales ${agent.name}.`,
+                          });
+                          if (!note) return;
+                          updateAgent.mutate({ id: agent.id, is_active: !willDeactivate, _note: note } as any);
+                        }}
                       >
                         <UserX className={cn("h-4 w-4", agent.is_active === false ? "text-muted-foreground" : "text-destructive")} />
                       </Button>

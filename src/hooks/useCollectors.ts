@@ -61,9 +61,9 @@ export const useCreateCollector = () => {
 export const useUpdateCollector = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...collector }: Partial<Collector> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...collector }: Partial<Collector> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('collectors')
         .update(collector)
@@ -71,16 +71,17 @@ export const useUpdateCollector = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['collectors'] });
-      
+
       logActivity.mutate({
         action: 'UPDATE',
         entity_type: 'collector',
         entity_id: data.id,
         description: `Updated collector ${data.name}`,
+        details: _note ? { note: _note } : null,
       });
     },
   });
@@ -89,30 +90,31 @@ export const useUpdateCollector = () => {
 export const useDeleteCollector = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { data: collectorData } = await supabase
         .from('collectors')
         .select('name, collector_code')
         .eq('id', id)
         .single();
-      
+
       const { error } = await supabase
         .from('collectors')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return { id, name: collectorData?.name, collector_code: collectorData?.collector_code };
+      return { id, name: collectorData?.name, collector_code: collectorData?.collector_code, _note };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['collectors'] });
-      
+
       logActivity.mutate({
         action: 'DELETE',
         entity_type: 'collector',
         entity_id: data.id,
         description: `Deleted collector ${data.name || data.id}`,
+        details: data._note ? { note: data._note } : null,
       });
     },
   });

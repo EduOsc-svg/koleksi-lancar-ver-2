@@ -41,6 +41,7 @@ import {
   useUpdateCommissionTier,
   useDeleteCommissionTier,
 } from "@/hooks/useCommissionTiersMutations";
+import { useAdminNote } from "@/contexts/AdminNoteContext";
 
 interface CommissionTiersDialogProps {
   open: boolean;
@@ -55,6 +56,7 @@ export function CommissionTiersDialog({
   const createTier = useCreateCommissionTier();
   const updateTier = useUpdateCommissionTier();
   const deleteTier = useDeleteCommissionTier();
+  const { promptAdminNote } = useAdminNote();
 
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -107,11 +109,17 @@ export function CommissionTiersDialog({
 
     try {
       if (selectedTier) {
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Tier Komisi",
+          description: "Tuliskan alasan perubahan ketentuan komisi.",
+        });
+        if (!note) return;
         await updateTier.mutateAsync({
           id: selectedTier.id,
           min_amount: minAmount,
           max_amount: maxAmount,
           percentage,
+          _note: note,
         });
         toast.success("Ketentuan komisi berhasil diperbarui");
       } else {
@@ -132,7 +140,14 @@ export function CommissionTiersDialog({
     if (!selectedTier) return;
 
     try {
-      await deleteTier.mutateAsync(selectedTier.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Tier Komisi",
+        description: "Tuliskan alasan menghapus ketentuan komisi ini.",
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteTier.mutateAsync({ id: selectedTier.id, _note: note });
       toast.success("Ketentuan komisi berhasil dihapus");
       setDeleteDialogOpen(false);
     } catch (error) {

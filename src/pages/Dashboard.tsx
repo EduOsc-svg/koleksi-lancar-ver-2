@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt, Ban } from "lucide-react";
+import { useAdminNote } from "@/contexts/AdminNoteContext";
 import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
 import { useMacetSummary, useMacetSummaryYearly } from "@/hooks/useMacetSummary";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ export default function Dashboard() {
   const { data: outstandingMonthly } = useOutstandingDetailsMonthly(selectedMonth);
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
+  const { promptAdminNote } = useAdminNote();
   
   // Pagination for sales agent performance table
   const AGENTS_PER_PAGE = 10;
@@ -461,7 +463,16 @@ export default function Dashboard() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => deleteExpense.mutate(expense.id)}
+                            onClick={async () => {
+                              const note = await promptAdminNote({
+                                title: "Catatan Hapus Biaya Operasional",
+                                description: `Tuliskan alasan menghapus "${expense.description}".`,
+                                confirmLabel: "Hapus",
+                                variant: "destructive",
+                              });
+                              if (!note) return;
+                              deleteExpense.mutate({ id: expense.id, _note: note });
+                            }}
                             disabled={deleteExpense.isPending}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
