@@ -314,6 +314,17 @@ export default function Dashboard() {
         />
 
         <StatCard
+          icon={Users}
+          iconColor="text-cyan-500"
+          label="Gaji Kolektor"
+          value={collectorSalaryTotal}
+          valueColor="text-cyan-600"
+          isNegative
+          subtitle="Total gaji bulan ini"
+          hoverInfo="Total gaji semua kolektor pada bulan ini. Sudah termasuk dalam Biaya Operasional (kategori: Gaji Kolektor)."
+        />
+
+        <StatCard
           icon={AlertTriangle}
           iconColor="text-destructive"
           label="Kerugian (Return)"
