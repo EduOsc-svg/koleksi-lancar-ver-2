@@ -272,6 +272,19 @@ export default function AuditLog() {
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm whitespace-pre-wrap">{formatDescriptionWithCurrency(translateAuditDescription(selectedLog.description, i18n.language))}</p>
               </div>
+              {(() => {
+                const d = selectedLog.details as { note?: string } | null;
+                const note = d && typeof d === 'object' && !Array.isArray(d) ? d.note : null;
+                if (!note) return null;
+                return (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Catatan Admin</p>
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+                      <p className="text-sm whitespace-pre-wrap">{note}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </DialogContent>
