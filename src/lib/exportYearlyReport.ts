@@ -383,9 +383,11 @@ export const exportYearlyReportToExcel = async (
     // Set column widths
     sheet.getColumn(1).width = 5;
     sheet.getColumn(2).width = 12;
-    sheet.getColumn(3).width = 25;
-    sheet.getColumn(4).width = 20;
-    [5, 6, 7, 8].forEach(col => {
+    sheet.getColumn(3).width = 12;
+    sheet.getColumn(4).width = 14;
+    sheet.getColumn(5).width = 25;
+    sheet.getColumn(6).width = 20;
+    [7, 8, 9].forEach(col => {
       sheet.getColumn(col).width = 18;
     });
   });
