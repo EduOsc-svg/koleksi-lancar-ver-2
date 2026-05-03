@@ -48,6 +48,7 @@ type HolidayType = 'specific_date' | 'recurring_weekday';
 
 export default function Holidays() {
   const { t } = useTranslation();
+  const { promptAdminNote } = useAdminNote();
   const { data: holidays, isLoading } = useHolidays();
   const createHoliday = useCreateHoliday();
   const updateHoliday = useUpdateHoliday();
@@ -136,9 +137,15 @@ export default function Holidays() {
           };
 
       if (selectedHoliday) {
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Libur",
+          description: "Tuliskan alasan perubahan data libur ini.",
+        });
+        if (!note) return;
         await updateHoliday.mutateAsync({
           id: selectedHoliday.id,
           ...payload,
+          _note: note,
         });
         toast.success(t("success.updated"));
       } else {
@@ -160,7 +167,14 @@ export default function Holidays() {
   const handleDelete = async () => {
     if (!selectedHoliday) return;
     try {
-      await deleteHoliday.mutateAsync(selectedHoliday.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Libur",
+        description: "Tuliskan alasan menghapus tanggal libur ini.",
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteHoliday.mutateAsync({ id: selectedHoliday.id, _note: note });
       toast.success(t("success.deleted"));
       setDeleteDialogOpen(false);
       setSelectedHoliday(null);
