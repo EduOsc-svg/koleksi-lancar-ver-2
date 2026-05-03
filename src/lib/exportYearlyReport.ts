@@ -258,7 +258,7 @@ export const exportYearlyReportToExcel = async (
 
     // Contract details table
     sheet.addRow([]);
-  const detailHeaders = ['No', 'Tanggal', 'Kode Sales', 'Kode Kontrak', 'Nama Konsumen', 'Produk', 'Modal', 'Omset', 'Persentase (Modal→Omset)'];
+  const detailHeaders = ['No', 'Tanggal', 'Kode Sales', 'Kode Kontrak', 'Nama Konsumen', 'Produk', 'Modal', 'Omset', 'Persentase'];
     const detailHeaderRow = sheet.addRow(detailHeaders);
     detailHeaderRow.font = { bold: true };
     detailHeaderRow.eachCell((cell) => {
