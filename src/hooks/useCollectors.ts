@@ -8,6 +8,7 @@ export interface Collector {
   collector_code: string;
   name: string;
   phone: string | null;
+  is_active: boolean;
   created_at: string;
 }
 

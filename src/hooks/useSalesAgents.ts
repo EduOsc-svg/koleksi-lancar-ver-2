@@ -13,6 +13,7 @@ export interface SalesAgent {
   monthly_omset: number;
   monthly_commission: number;
   last_monthly_reset: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
