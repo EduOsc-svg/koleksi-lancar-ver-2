@@ -214,20 +214,22 @@ export function ManifestTable({
                     {formatRupiah(contract.daily_installment_amount)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {unpaidCoupons > 0 ? (
-                      <div className="flex flex-col items-end">
-                        <span className={cn("font-medium text-destructive")}>
-                          {formatRupiah(unpaidAmount)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {unpaidCoupons} kupon
-                        </span>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 text-xs">
-                        Lunas
-                      </Badge>
-                    )}
+                    {(() => {
+                      const st = calcManifestStatus(contract);
+                      const meta = STATUS_META[st];
+                      return (
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="outline" className={cn("text-xs", meta.cls)}>
+                            {meta.label}
+                          </Badge>
+                          {unpaidCoupons > 0 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatRupiah(unpaidAmount)} • {unpaidCoupons} kupon
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               );
