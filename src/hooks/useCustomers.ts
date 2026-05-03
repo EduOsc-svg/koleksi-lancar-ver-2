@@ -61,9 +61,9 @@ export const useCreateCustomer = () => {
 export const useUpdateCustomer = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...customer }: Partial<CustomerCreateInput> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...customer }: Partial<CustomerCreateInput> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('customers')
         .update(customer)
@@ -71,17 +71,18 @@ export const useUpdateCustomer = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      
+
       logActivity.mutate({
         action: 'UPDATE',
         entity_type: 'customer',
         entity_id: data.id,
         description: `Updated customer ${data.name}`,
         customer_id: data.id,
+        details: _note ? { note: _note } : null,
       });
     },
   });
@@ -90,30 +91,31 @@ export const useUpdateCustomer = () => {
 export const useDeleteCustomer = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { data: customerData } = await supabase
         .from('customers')
         .select('name')
         .eq('id', id)
         .single();
-      
+
       const { error } = await supabase
         .from('customers')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return { id, name: customerData?.name };
+      return { id, name: customerData?.name, _note };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      
+
       logActivity.mutate({
         action: 'DELETE',
         entity_type: 'customer',
         entity_id: data.id,
         description: `Deleted customer ${data.name || data.id}`,
+        details: data._note ? { note: data._note } : null,
       });
     },
   });

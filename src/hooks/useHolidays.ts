@@ -66,7 +66,7 @@ export const useUpdateHoliday = () => {
   const logActivity = useLogActivity();
 
   return useMutation({
-    mutationFn: async ({ id, ...holiday }: Partial<Holiday> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...holiday }: Partial<Holiday> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('holidays')
         .update(holiday)
@@ -74,15 +74,16 @@ export const useUpdateHoliday = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       logActivity.mutate({
         action: 'UPDATE',
         entity_type: 'holiday',
         entity_id: data.id,
         description: `Updated holiday: ${data.holiday_date}`,
+        details: _note ? { note: _note } : null,
       });
     },
   });
@@ -93,7 +94,7 @@ export const useDeleteHoliday = () => {
   const logActivity = useLogActivity();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { data: holidayData } = await supabase
         .from('holidays')
         .select('holiday_date, description')
@@ -105,7 +106,7 @@ export const useDeleteHoliday = () => {
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return { id, ...holidayData };
+      return { id, ...holidayData, _note };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
@@ -114,6 +115,7 @@ export const useDeleteHoliday = () => {
         entity_type: 'holiday',
         entity_id: data.id,
         description: `Deleted holiday: ${data.holiday_date || data.id}`,
+        details: data._note ? { note: data._note } : null,
       });
     },
   });

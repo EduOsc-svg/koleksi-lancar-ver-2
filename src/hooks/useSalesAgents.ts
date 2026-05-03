@@ -72,9 +72,9 @@ export const useCreateSalesAgent = () => {
 export const useUpdateSalesAgent = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...agent }: Partial<SalesAgent> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...agent }: Partial<SalesAgent> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('sales_agents')
         .update(agent)
@@ -82,17 +82,18 @@ export const useUpdateSalesAgent = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['sales_agents'] });
-      
+
       logActivity.mutate({
         action: 'UPDATE',
         entity_type: 'sales_agent',
         entity_id: data.id,
         description: `Updated sales agent ${data.name}`,
         sales_agent_id: data.id,
+        details: _note ? { note: _note } : null,
       });
     },
   });
@@ -101,31 +102,31 @@ export const useUpdateSalesAgent = () => {
 export const useDeleteSalesAgent = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      // Get agent info before deleting
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { data: agentData } = await supabase
         .from('sales_agents')
         .select('name, agent_code')
         .eq('id', id)
         .single();
-      
+
       const { error } = await supabase
         .from('sales_agents')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return { id, name: agentData?.name, agent_code: agentData?.agent_code };
+      return { id, name: agentData?.name, agent_code: agentData?.agent_code, _note };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales_agents'] });
-      
+
       logActivity.mutate({
         action: 'DELETE',
         entity_type: 'sales_agent',
         entity_id: data.id,
         description: `Deleted sales agent ${data.name || data.id}`,
+        details: data._note ? { note: data._note } : null,
       });
     },
   });
