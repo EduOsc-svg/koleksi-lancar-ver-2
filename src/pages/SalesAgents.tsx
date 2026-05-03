@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, Download, Eye, Settings, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Eye, Settings, ChevronLeft, ChevronRight, Calendar, UserX } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import ExcelJS from "exceljs";
@@ -693,7 +693,16 @@ export default function SalesAgents() {
                       highlightedRowId === agent.id && "bg-accent border-primary/30 animate-pulse"
                     )}
                   >
-                    <TableCell className="font-medium">{agent.agent_code}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {agent.agent_code}
+                        {agent.is_active === false && (
+                          <Badge variant="outline" className="text-xs gap-1 border-destructive/40 text-destructive">
+                            <UserX className="h-3 w-3" /> Nonaktif
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{agent.name}</TableCell>
                     <TableCell>{agent.phone || "-"}</TableCell>
                     <TableCell className="font-medium">{formatRupiah(displayOmset)}</TableCell>
@@ -721,6 +730,14 @@ export default function SalesAgents() {
                         }}
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title={agent.is_active === false ? "Aktifkan kembali" : "Tandai tidak bekerja"}
+                        onClick={() => updateAgent.mutate({ id: agent.id, is_active: !(agent.is_active === false ? false : true) } as any)}
+                      >
+                        <UserX className={cn("h-4 w-4", agent.is_active === false ? "text-muted-foreground" : "text-destructive")} />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(agent)}>
                         <Pencil className="h-4 w-4" />
