@@ -1071,7 +1071,7 @@ export default function Contracts() {
                         <CommandList>
                           <CommandEmpty>Sales agent tidak ditemukan.</CommandEmpty>
                           <CommandGroup>
-                            {salesAgents?.map((agent) => (
+                            {salesAgents?.filter((a) => a.is_active !== false || a.id === formData.sales_agent_id).map((agent) => (
                               <CommandItem
                                 key={agent.id}
                                 value={`${agent.name} ${agent.agent_code}`}
@@ -1126,7 +1126,7 @@ export default function Contracts() {
                         <CommandList>
                           <CommandEmpty>Kolektor tidak ditemukan.</CommandEmpty>
                           <CommandGroup>
-                            {collectors?.map((collector) => (
+                            {collectors?.filter((c) => c.is_active !== false || c.id === formData.collector_id).map((collector) => (
                               <CommandItem
                                 key={collector.id}
                                 value={`${collector.name} ${collector.collector_code}`}
