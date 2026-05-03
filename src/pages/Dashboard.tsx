@@ -48,6 +48,7 @@ import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChar
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
 import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
 import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
+import { useCollectorSalaryTotal } from "@/hooks/useCollectorSalaries";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -81,6 +82,7 @@ export default function Dashboard() {
   const { data: outstandingMonthly } = useOutstandingDetailsMonthly(selectedMonth);
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
+  const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
   const { promptAdminNote } = useAdminNote();
   
   // Pagination for sales agent performance table
@@ -309,6 +311,17 @@ export default function Dashboard() {
           isNegative
           subtitle="Pengeluaran bulan ini"
           hoverInfo="Total biaya operasional yang dicatat di bulan ini (transport, komunikasi, dll)."
+        />
+
+        <StatCard
+          icon={Users}
+          iconColor="text-cyan-500"
+          label="Gaji Kolektor"
+          value={collectorSalaryTotal}
+          valueColor="text-cyan-600"
+          isNegative
+          subtitle="Total gaji bulan ini"
+          hoverInfo="Total gaji semua kolektor pada bulan ini. Sudah termasuk dalam Biaya Operasional (kategori: Gaji Kolektor)."
         />
 
         <StatCard
