@@ -56,7 +56,9 @@ function StatusBadge({ status }: { status: HandoverStatus }) {
 /* ─── Main Component ─── */
 export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Default: hanya tampilkan yang belum bayar (sebagian/belum). Yang lunas disembunyikan
+  // — sudah tersedia di Excel "Export Per Kolektor" pada tab Input Pembayaran.
+  const [statusFilter, setStatusFilter] = useState<string>("unpaid_only");
 
   // Enrich handovers with status
   const enrichedHandovers = (handovers || []).map(h => ({
@@ -73,7 +75,9 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
       const collector = h.collectors?.name || '';
       if (!name.toLowerCase().includes(q) && !ref.toLowerCase().includes(q) && !collector.toLowerCase().includes(q)) return false;
     }
-    if (statusFilter !== 'all' && h.status !== statusFilter) return false;
+    if (statusFilter === 'unpaid_only') {
+      if (h.status === 'fully_paid') return false;
+    } else if (statusFilter !== 'all' && h.status !== statusFilter) return false;
     return true;
   });
 
@@ -190,6 +194,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
           <SelectValue placeholder="Semua Status" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="unpaid_only">Belum Bayar Saja ({unpaidCount + partialCount})</SelectItem>
           <SelectItem value="all">Semua ({allHandovers.length})</SelectItem>
           <SelectItem value="fully_paid">Lunas ({fullyPaidCount})</SelectItem>
           <SelectItem value="partially_paid">Sebagian ({partialCount})</SelectItem>
