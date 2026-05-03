@@ -58,6 +58,7 @@ import { useCommissionTiers, calculateTieredCommission } from "@/hooks/useCommis
 
 export default function SalesAgents() {
   const { t } = useTranslation();
+  const { promptAdminNote } = useAdminNote();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
   const { data: agents, isLoading } = useSalesAgents();
@@ -274,7 +275,12 @@ export default function SalesAgents() {
   const handleSubmit = async () => {
     try {
       if (selectedAgent) {
-        await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData });
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Sales",
+          description: `Tuliskan alasan perubahan data sales ${selectedAgent.name}.`,
+        });
+        if (!note) return;
+        await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData, _note: note } as any);
         toast.success(t("success.updated"));
       } else {
         await createAgent.mutateAsync(formData);
@@ -289,7 +295,14 @@ export default function SalesAgents() {
   const handleDelete = async () => {
     if (!selectedAgent) return;
     try {
-      await deleteAgent.mutateAsync(selectedAgent.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Sales",
+        description: `Tuliskan alasan menghapus sales ${selectedAgent.name}.`,
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteAgent.mutateAsync({ id: selectedAgent.id, _note: note });
       toast.success(t("success.deleted"));
       setDeleteDialogOpen(false);
     } catch (error) {
