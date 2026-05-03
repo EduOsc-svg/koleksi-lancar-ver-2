@@ -59,6 +59,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function Collectors() {
   const { t } = useTranslation();
+  const { promptAdminNote } = useAdminNote();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlightId");
 
@@ -191,13 +192,19 @@ export default function Collectors() {
     try {
       let savedCollector: Collector | null = null;
       if (selectedCollector) {
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Kolektor",
+          description: `Tuliskan alasan perubahan data kolektor ${selectedCollector.name}.`,
+        });
+        if (!note) return;
         const updated = await updateCollector.mutateAsync({
           id: selectedCollector.id,
           collector_code: formData.collector_code,
           name: formData.name,
           phone: formData.phone || null,
+          _note: note,
         });
-        savedCollector = updated as Collector;
+        savedCollector = (updated as any).data as Collector;
         toast.success("Kolektor berhasil diperbarui");
       } else {
         const created = await createCollector.mutateAsync({
@@ -242,7 +249,14 @@ export default function Collectors() {
   const handleDelete = async () => {
     if (!selectedCollector) return;
     try {
-      await deleteCollector.mutateAsync(selectedCollector.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Kolektor",
+        description: `Tuliskan alasan menghapus kolektor ${selectedCollector.name}.`,
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteCollector.mutateAsync({ id: selectedCollector.id, _note: note });
       toast.success("Kolektor berhasil dihapus");
       setDeleteDialogOpen(false);
     } catch (error) {
