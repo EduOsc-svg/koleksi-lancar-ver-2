@@ -749,7 +749,15 @@ export default function SalesAgents() {
                         variant="ghost"
                         size="icon"
                         title={agent.is_active === false ? "Aktifkan kembali" : "Tandai tidak bekerja"}
-                        onClick={() => updateAgent.mutate({ id: agent.id, is_active: !(agent.is_active === false ? false : true) } as any)}
+                        onClick={async () => {
+                          const willDeactivate = agent.is_active !== false;
+                          const note = await promptAdminNote({
+                            title: willDeactivate ? "Catatan Nonaktifkan Sales" : "Catatan Aktifkan Sales",
+                            description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} sales ${agent.name}.`,
+                          });
+                          if (!note) return;
+                          updateAgent.mutate({ id: agent.id, is_active: !willDeactivate, _note: note } as any);
+                        }}
                       >
                         <UserX className={cn("h-4 w-4", agent.is_active === false ? "text-muted-foreground" : "text-destructive")} />
                       </Button>
