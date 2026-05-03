@@ -385,7 +385,15 @@ export default function Collectors() {
                           variant="ghost"
                           size="icon"
                           title={collector.is_active === false ? "Aktifkan kembali" : "Tandai tidak bekerja"}
-                          onClick={() => updateCollector.mutate({ id: collector.id, is_active: !(collector.is_active === false ? false : true) } as any)}
+                          onClick={async () => {
+                            const willDeactivate = collector.is_active !== false;
+                            const note = await promptAdminNote({
+                              title: willDeactivate ? "Catatan Nonaktifkan Kolektor" : "Catatan Aktifkan Kolektor",
+                              description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} kolektor ${collector.name}.`,
+                            });
+                            if (!note) return;
+                            updateCollector.mutate({ id: collector.id, is_active: !willDeactivate, _note: note } as any);
+                          }}
                         >
                           <UserX className={`h-4 w-4 ${collector.is_active === false ? 'text-muted-foreground' : 'text-destructive'}`} />
                         </Button>

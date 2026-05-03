@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAdminNote } from "@/contexts/AdminNoteContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
