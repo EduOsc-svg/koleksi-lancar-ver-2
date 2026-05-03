@@ -171,6 +171,8 @@ export const useDeleteContract = () => {
     },
   });
 };
+
+export const useInvoiceDetails = () => {
   return useQuery({
     queryKey: ['invoice_details'],
     queryFn: async () => {
