@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
+import { AdminNoteProvider } from "@/contexts/AdminNoteContext";
 
 // Eager imports for frequently accessed/small pages
 import Auth from "./pages/Auth";
@@ -106,7 +107,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <AdminNoteProvider>
+            <AppRoutes />
+          </AdminNoteProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
