@@ -250,7 +250,7 @@ export const exportYearlyReportToExcel = async (
     const sheet = workbook.addWorksheet(sheetName);
 
   // Title
-  sheet.mergeCells('A1:G1');
+  sheet.mergeCells('A1:I1');
     const mTitleCell = sheet.getCell('A1');
     mTitleCell.value = `DETAIL TRANSAKSI - ${sheetName.toUpperCase()} ${year}`;
     mTitleCell.font = { bold: true, size: 14 };
@@ -258,7 +258,7 @@ export const exportYearlyReportToExcel = async (
 
     // Contract details table
     sheet.addRow([]);
-  const detailHeaders = ['No', 'Tanggal', 'Kode Kontrak', 'Nama Konsumen', 'Produk', 'Omset', 'Persentase (Total)'];
+  const detailHeaders = ['No', 'Tanggal', 'Kode Sales', 'Kode Kontrak', 'Nama Konsumen', 'Produk', 'Modal', 'Omset', 'Persentase (Modal→Omset)'];
     const detailHeaderRow = sheet.addRow(detailHeaders);
     detailHeaderRow.font = { bold: true };
     detailHeaderRow.eachCell((cell) => {
@@ -280,23 +280,25 @@ export const exportYearlyReportToExcel = async (
         return da - db;
       });
 
-      const monthTotal = monthDetail.total_omset || sortedContracts.reduce((s, c) => s + Number(c.omset || 0), 0);
       sortedContracts.forEach((contract, idx) => {
-        const dateLabel = contract.start_date ? format(new Date(contract.start_date), 'yyyy-MM-dd') : '';
+        const dateLabel = contract.start_date ? format(new Date(contract.start_date), 'd-M-yyyy') : '';
+        const modalVal = Number(contract.modal || 0);
         const omsetVal = Number(contract.omset || 0);
-        const pct = monthTotal > 0 ? omsetVal / monthTotal : 0;
+        const rowNum = detailStartRow + idx;
         const row = sheet.addRow([
           idx + 1,
           dateLabel,
+          contract.agent_code || '',
           contract.contract_ref || '',
           contract.customer_name,
           contract.product_type,
+          modalVal,
           omsetVal,
-          pct,
+          { formula: `IF(G${rowNum}=0,0,(H${rowNum}-G${rowNum})/G${rowNum})` },
         ]);
-        // format Omset and Persentase
-        row.getCell(6).numFmt = '"Rp "#,##0';
-        row.getCell(7).numFmt = '0.00%';
+        row.getCell(7).numFmt = '"Rp "#,##0';
+        row.getCell(8).numFmt = '"Rp "#,##0';
+        row.getCell(9).numFmt = '0.00%';
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin' }, bottom: { style: 'thin' },
@@ -308,18 +310,18 @@ export const exportYearlyReportToExcel = async (
       // Totals row with SUM formulas
       const detailEndRow = detailStartRow + monthDetail.contracts.length - 1;
       const totalRow = sheet.addRow([
-        '', '', '', 'TOTAL',
-        '',
-        { formula: `SUM(F${detailStartRow}:F${detailEndRow})` },
-        { formula: `IF(SUM(F${detailStartRow}:F${detailEndRow})=0,0,1)` },
+        '', '', '', '', '', 'TOTAL',
+        { formula: `SUM(G${detailStartRow}:G${detailEndRow})` },
+        { formula: `SUM(H${detailStartRow}:H${detailEndRow})` },
+        { formula: `IF(SUM(G${detailStartRow}:G${detailEndRow})=0,0,(SUM(H${detailStartRow}:H${detailEndRow})-SUM(G${detailStartRow}:G${detailEndRow}))/SUM(G${detailStartRow}:G${detailEndRow}))` },
       ]);
       totalRow.font = { bold: true };
       totalRow.eachCell((cell, colNumber) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
-        if (colNumber === 6) {
+        if (colNumber === 7 || colNumber === 8) {
           cell.numFmt = '"Rp "#,##0';
         }
-        if (colNumber === 7) {
+        if (colNumber === 9) {
           cell.numFmt = '0.00%';
         }
         cell.border = {
