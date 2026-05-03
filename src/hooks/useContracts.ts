@@ -88,9 +88,9 @@ export const useCreateContract = () => {
 export const useUpdateContract = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...contract }: Partial<CreditContract> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...contract }: Partial<CreditContract> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('credit_contracts')
         .update(contract)
@@ -98,18 +98,19 @@ export const useUpdateContract = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
-      
+
       logActivity.mutate({
         action: 'UPDATE',
         entity_type: 'contract',
         entity_id: data.id,
         description: `Updated contract ${data.contract_ref}`,
         contract_id: data.id,
+        details: _note ? { note: _note } : null,
       });
     },
   });
@@ -118,17 +119,15 @@ export const useUpdateContract = () => {
 export const useDeleteContract = () => {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { data: contractData } = await supabase
         .from('credit_contracts')
         .select('contract_ref')
         .eq('id', id)
         .single();
-      
-      // Hapus child rows dulu agar delete tidak gagal karena FK constraint
-      // (payment_logs & coupon_handovers tidak punya ON DELETE CASCADE).
+
       const { error: phErr } = await supabase
         .from('payment_logs')
         .delete()
@@ -141,7 +140,6 @@ export const useDeleteContract = () => {
         .eq('contract_id', id);
       if (chErr) throw new Error(`Gagal hapus riwayat serah terima kupon: ${chErr.message}`);
 
-      // installment_coupons biasanya CASCADE, tapi hapus eksplisit untuk memastikan
       const { error: icErr } = await supabase
         .from('installment_coupons')
         .delete()
@@ -153,7 +151,7 @@ export const useDeleteContract = () => {
         .delete()
         .eq('id', id);
       if (error) throw new Error(`Gagal hapus kontrak: ${error.message}`);
-      return { id, contract_ref: contractData?.contract_ref };
+      return { id, contract_ref: contractData?.contract_ref, _note };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
@@ -162,18 +160,17 @@ export const useDeleteContract = () => {
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
       queryClient.invalidateQueries({ queryKey: ['coupon_handovers'] });
       queryClient.invalidateQueries({ queryKey: ['outstanding_coupons'] });
-      
+
       logActivity.mutate({
         action: 'DELETE',
         entity_type: 'contract',
         entity_id: data.id,
         description: `Deleted contract ${data.contract_ref || data.id}`,
+        details: data._note ? { note: data._note } : null,
       });
     },
   });
 };
-
-export const useInvoiceDetails = () => {
   return useQuery({
     queryKey: ['invoice_details'],
     queryFn: async () => {
