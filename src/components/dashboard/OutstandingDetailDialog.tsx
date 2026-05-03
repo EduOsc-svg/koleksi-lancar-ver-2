@@ -51,43 +51,45 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
           {/* Per Sales */}
           <div>
             <h3 className="text-sm font-semibold mb-2">Rekap per Sales</h3>
-            <ScrollArea className="max-h-[220px] rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sales</TableHead>
-                    <TableHead className="text-right">Kontrak</TableHead>
-                    <TableHead className="text-right">Total Kontrak</TableHead>
-                    <TableHead className="text-right">Tertagih</TableHead>
-                    <TableHead className="text-right">Sisa Tagihan</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data?.by_sales || []).length === 0 ? (
+            <div className="rounded-md border">
+              <div className="max-h-[260px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        Tidak ada data
-                      </TableCell>
+                      <TableHead>Sales</TableHead>
+                      <TableHead className="text-right">Kontrak</TableHead>
+                      <TableHead className="text-right">Total Kontrak</TableHead>
+                      <TableHead className="text-right">Tertagih</TableHead>
+                      <TableHead className="text-right">Sisa Tagihan</TableHead>
                     </TableRow>
-                  ) : (
-                    data!.by_sales.map((s) => (
-                      <TableRow key={s.sales_id || 'none'}>
-                        <TableCell>
-                          <div className="font-medium">{s.sales_name}</div>
-                          {s.sales_code && (
-                            <div className="text-xs text-muted-foreground">{s.sales_code}</div>
-                          )}
+                  </TableHeader>
+                  <TableBody>
+                    {(data?.by_sales || []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          Tidak ada data
                         </TableCell>
-                        <TableCell className="text-right">{s.contract_count}</TableCell>
-                        <TableCell className="text-right">{formatRupiah(s.total_contract)}</TableCell>
-                        <TableCell className="text-right text-green-600">{formatRupiah(s.total_paid)}</TableCell>
-                        <TableCell className="text-right text-destructive font-semibold">{formatRupiah(s.total_outstanding)}</TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                    ) : (
+                      data!.by_sales.map((s) => (
+                        <TableRow key={s.sales_id || 'none'}>
+                          <TableCell>
+                            <div className="font-medium">{s.sales_name}</div>
+                            {s.sales_code && (
+                              <div className="text-xs text-muted-foreground">{s.sales_code}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{s.contract_count}</TableCell>
+                          <TableCell className="text-right">{formatRupiah(s.total_contract)}</TableCell>
+                          <TableCell className="text-right text-green-600">{formatRupiah(s.total_paid)}</TableCell>
+                          <TableCell className="text-right text-destructive font-semibold">{formatRupiah(s.total_outstanding)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </div>
 
           {/* Detail per Kontrak */}
