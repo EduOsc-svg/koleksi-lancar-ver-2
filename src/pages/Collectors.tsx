@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Pencil, Trash, Wallet, ArrowLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash, Wallet, ArrowLeft, ChevronRight, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, addMonths, subMonths } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -343,7 +343,14 @@ export default function Collectors() {
                   >
                     <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{collector.collector_code}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{collector.collector_code}</Badge>
+                        {collector.is_active === false && (
+                          <Badge variant="outline" className="text-xs gap-1 border-destructive/40 text-destructive">
+                            <UserX className="h-3 w-3" /> Nonaktif
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">{collector.name}</TableCell>
                     <TableCell>{collector.phone || "-"}</TableCell>
@@ -359,6 +366,14 @@ export default function Collectors() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={collector.is_active === false ? "Aktifkan kembali" : "Tandai tidak bekerja"}
+                          onClick={() => updateCollector.mutate({ id: collector.id, is_active: !(collector.is_active === false ? false : true) } as any)}
+                        >
+                          <UserX className={`h-4 w-4 ${collector.is_active === false ? 'text-muted-foreground' : 'text-destructive'}`} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
