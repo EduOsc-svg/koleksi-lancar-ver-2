@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CommissionTier } from './useCommissionTiers';
+import { useLogActivity } from './useActivityLog';
 
 // Create a new commission tier
 export const useCreateCommissionTier = () => {
@@ -25,9 +26,10 @@ export const useCreateCommissionTier = () => {
 // Update an existing commission tier
 export const useUpdateCommissionTier = () => {
   const queryClient = useQueryClient();
-  
+  const logActivity = useLogActivity();
+
   return useMutation({
-    mutationFn: async ({ id, ...tier }: Partial<CommissionTier> & { id: string }) => {
+    mutationFn: async ({ id, _note, ...tier }: Partial<CommissionTier> & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('commission_tiers')
         .update(tier)
@@ -35,10 +37,17 @@ export const useUpdateCommissionTier = () => {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
-    onSuccess: () => {
+    onSuccess: ({ data, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['commission_tiers'] });
+      logActivity.mutate({
+        action: 'UPDATE',
+        entity_type: 'commission_tier',
+        entity_id: data.id,
+        description: `Updated commission tier`,
+        details: _note ? { note: _note } : null,
+      });
     },
   });
 };
@@ -46,18 +55,26 @@ export const useUpdateCommissionTier = () => {
 // Delete a commission tier
 export const useDeleteCommissionTier = () => {
   const queryClient = useQueryClient();
-  
+  const logActivity = useLogActivity();
+
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { error } = await supabase
         .from('commission_tiers')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return id;
+      return { id, _note };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['commission_tiers'] });
+      logActivity.mutate({
+        action: 'DELETE',
+        entity_type: 'commission_tier',
+        entity_id: id,
+        description: `Deleted commission tier`,
+        details: _note ? { note: _note } : null,
+      });
     },
   });
 };

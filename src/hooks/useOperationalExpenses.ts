@@ -74,16 +74,16 @@ export const useOperationalExpenseMutations = () => {
   });
 
   const updateExpense = useMutation({
-    mutationFn: async ({ id, ...input }: OperationalExpenseInput & { id: string }) => {
+    mutationFn: async ({ id, _note, ...input }: OperationalExpenseInput & { id: string; _note?: string }) => {
       const { data, error } = await supabase
         .from('operational_expenses')
         .update(input)
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
-      return data;
+      return { data, _note };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
@@ -95,13 +95,14 @@ export const useOperationalExpenseMutations = () => {
   });
 
   const deleteExpense = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, _note }: { id: string; _note?: string }) => {
       const { error } = await supabase
         .from('operational_expenses')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
+      return { id, _note };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
