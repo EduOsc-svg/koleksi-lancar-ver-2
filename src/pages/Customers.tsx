@@ -56,6 +56,7 @@ import { SearchInput } from "@/components/ui/search-input";
 
 export default function Customers() {
   const { t } = useTranslation();
+  const { promptAdminNote } = useAdminNote();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
@@ -210,7 +211,12 @@ export default function Customers() {
       };
       
       if (selectedCustomer) {
-        await updateCustomer.mutateAsync({ id: selectedCustomer.id, ...submitData });
+        const note = await promptAdminNote({
+          title: "Catatan Pembaruan Customer",
+          description: `Tuliskan alasan perubahan data customer ${selectedCustomer.name}.`,
+        });
+        if (!note) return;
+        await updateCustomer.mutateAsync({ id: selectedCustomer.id, ...submitData, _note: note } as any);
         toast.success(t("success.updated", "Data berhasil diperbarui"));
       } else {
         const newCustomer = await createCustomer.mutateAsync(submitData);
@@ -241,7 +247,14 @@ export default function Customers() {
   const handleDelete = async () => {
     if (!selectedCustomer) return;
     try {
-      await deleteCustomer.mutateAsync(selectedCustomer.id);
+      const note = await promptAdminNote({
+        title: "Catatan Hapus Customer",
+        description: `Tuliskan alasan menghapus customer ${selectedCustomer.name}.`,
+        confirmLabel: "Hapus",
+        variant: "destructive",
+      });
+      if (!note) return;
+      await deleteCustomer.mutateAsync({ id: selectedCustomer.id, _note: note });
       toast.success(t("success.deleted"));
       setDeleteDialogOpen(false);
     } catch (error) {
