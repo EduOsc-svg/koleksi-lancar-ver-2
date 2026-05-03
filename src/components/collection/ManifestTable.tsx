@@ -21,8 +21,35 @@ interface Contract {
   current_installment_index: number;
   daily_installment_amount: number;
   tenor_days: number;
+  start_date?: string;
+  created_at?: string;
+  status?: string;
   customers: { name: string } | null;
 }
+
+type ManifestStatus = 'lancar' | 'kurang_lancar' | 'macet' | 'returned' | 'completed';
+
+function calcManifestStatus(c: Contract): ManifestStatus {
+  if (c.status === 'returned') return 'returned';
+  if (c.status === 'completed' || (c.tenor_days > 0 && c.current_installment_index >= c.tenor_days)) return 'completed';
+  const ref = c.start_date || c.created_at;
+  if (!ref) return 'lancar';
+  const days = Math.max(1, Math.floor((Date.now() - new Date(ref).getTime()) / 86400000));
+  const paid = c.current_installment_index;
+  if (paid === 0) return days > 7 ? 'macet' : days > 3 ? 'kurang_lancar' : 'lancar';
+  const ratio = days / paid;
+  if (ratio <= 1.2) return 'lancar';
+  if (ratio <= 2.0) return 'kurang_lancar';
+  return 'macet';
+}
+
+const STATUS_META: Record<ManifestStatus, { label: string; cls: string }> = {
+  lancar:        { label: 'Lancar',        cls: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300' },
+  kurang_lancar: { label: 'Kurang Lancar', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  macet:         { label: 'Macet',         cls: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300' },
+  returned:      { label: 'Return',        cls: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300' },
+  completed:     { label: 'Lunas',         cls: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300' },
+};
 
 interface ManifestTableProps {
   contracts: Contract[] | undefined;
