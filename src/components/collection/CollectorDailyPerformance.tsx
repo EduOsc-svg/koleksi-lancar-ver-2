@@ -113,6 +113,7 @@ export function CollectorDailyPerformance() {
                     <TableHead className="text-right">Kupon Dipegang</TableHead>
                     <TableHead className="text-right">Kupon Tertagih</TableHead>
                     <TableHead className="text-right">Kontrak</TableHead>
+                    <TableHead className="text-right">Total Tagihan</TableHead>
                     <TableHead className="text-right">Total Tertagih</TableHead>
                     <TableHead className="w-48">Keberhasilan</TableHead>
                     <TableHead>Status</TableHead>
