@@ -84,6 +84,7 @@ export default function Dashboard() {
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
+  const collectorSalaryTotalYearly = useCollectorSalaryTotalYearly(selectedYear);
   const { promptAdminNote } = useAdminNote();
   
   // Pagination for sales agent performance table
