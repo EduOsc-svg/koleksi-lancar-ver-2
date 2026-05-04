@@ -679,21 +679,42 @@ export default function Dashboard() {
                 />
 
                 <StatCard
+                  icon={CircleDollarSign}
+                  iconColor="text-emerald-500"
+                  label="Margin Kotor"
+                  value={yearlyGrossProfitMargin}
+                  isPercentage
+                  valueColor={yearlyGrossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
+                  subtitle="(Omset − Modal) / Modal"
+                  hoverInfo="Persentase markup tahunan dari modal."
+                />
+
+                <StatCard
                   icon={Percent}
                   iconColor="text-purple-500"
                   label="Total Komisi"
-                  value={yearlyFinancial?.total_commission ?? 0}
+                  value={yearlyBonusCommission}
                   valueColor="text-purple-600"
-                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_commission ?? 0)} | Dari ${yearlyFinancial?.contracts_count ?? 0} kontrak`}
+                  subtitle={`Bonus tahunan ${YEARLY_BONUS_PERCENTAGE}% × Omset`}
+                  hoverInfo={`Komisi tahunan dihitung dari ${YEARLY_BONUS_PERCENTAGE}% × Total Omset tahun ${selectedYear.getFullYear()} (bukan akumulasi komisi bulanan).`}
                 />
 
                 <StatCard
                   icon={CheckCircle}
                   iconColor="text-teal-500"
+                  label="Tertagih"
+                  value={yearlyFinancial?.total_collected ?? 0}
+                  valueColor="text-teal-600"
+                  subtitle={`Pembayaran masuk tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total uang yang benar-benar tertagih (cash inflow) sepanjang tahun ${selectedYear.getFullYear()}.`}
+                />
+
+                <StatCard
+                  icon={Wallet}
+                  iconColor="text-red-500"
                   label="Sisa Tagihan"
                   value={yearlyFinancial?.total_to_collect ?? 0}
-                  valueColor="text-teal-600"
+                  valueColor="text-red-600"
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}\n\nKlik Detail untuk lihat per sales & per kontrak.`}
                   onDetailClick={() => { setOutstandingDetailScope('yearly'); setOutstandingDetailOpen(true); }}
@@ -708,6 +729,17 @@ export default function Dashboard() {
                   isNegative
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_expenses ?? 0)} | Biaya operasional tahun ${selectedYear.getFullYear()}`}
+                />
+
+                <StatCard
+                  icon={Users}
+                  iconColor="text-cyan-500"
+                  label="Gaji Kolektor"
+                  value={collectorSalaryTotalYearly}
+                  valueColor="text-cyan-600"
+                  isNegative
+                  subtitle={`Total gaji tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo="Total gaji semua kolektor sepanjang tahun. Sudah termasuk dalam Biaya Operasional (kategori: Gaji Kolektor)."
                 />
 
                 <StatCard
@@ -734,6 +766,27 @@ export default function Dashboard() {
                 />
 
               </div>
+
+              {/* Yearly Net Profit Card */}
+              <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Keuntungan Bersih Tahunan</p>
+                      <p className={`text-3xl font-bold ${yearlyNetProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {formatRupiah(yearlyNetProfit)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Keuntungan Kotor − Komisi Tahunan ({YEARLY_BONUS_PERCENTAGE}%) − Biaya Operasional
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Periode</p>
+                      <p className="font-medium">Tahun {selectedYear.getFullYear()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Monthly Breakdown Chart */}
               <div>
