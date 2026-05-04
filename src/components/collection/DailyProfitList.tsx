@@ -102,6 +102,7 @@ export function DailyProfitList() {
         contract_ref: string;
         customer_name: string;
         coupons_paid: number;
+        total_tagihan: number;
         collected: number;
         modal_portion: number;
         profit_portion: number;
@@ -116,11 +117,13 @@ export function DailyProfitList() {
         contract_ref: info.contract_ref,
         customer_name: info.customer_name,
         coupons_paid: 0,
+        total_tagihan: 0,
         collected: 0,
         modal_portion: 0,
         profit_portion: 0,
       };
       existing.coupons_paid += 1;
+      existing.total_tagihan += info.daily_installment_amount;
       existing.collected += Number(p.amount_paid || 0);
       existing.modal_portion += info.modal_per_coupon;
       existing.profit_portion += info.profit_per_coupon;
