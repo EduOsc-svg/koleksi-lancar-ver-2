@@ -871,6 +871,8 @@ export default function Dashboard() {
                           const profitMargin = agent.total_modal > 0 
                             ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
+                          // Komisi tahunan = bonus tahunan 0.8% × omset agen
+                          const yearlyAgentCommission = (agent.total_omset * YEARLY_BONUS_PERCENTAGE) / 100;
                           return (
                             <TableRow 
                               key={agent.agent_id}
