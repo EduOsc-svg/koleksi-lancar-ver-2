@@ -68,6 +68,7 @@ export function DailyProfitList() {
         profit_per_coupon: number;
         modal_per_coupon: number;
         omset_per_coupon: number;
+        daily_installment_amount: number;
       }
     >();
     (contracts || []).forEach((c: any) => {
@@ -85,6 +86,7 @@ export function DailyProfitList() {
         profit_per_coupon: profitTotal / tenor,
         modal_per_coupon: modalTotal / tenor,
         omset_per_coupon: omsetTotal / tenor,
+        daily_installment_amount: Number(c.daily_installment_amount || 0),
       });
     });
     return map;
