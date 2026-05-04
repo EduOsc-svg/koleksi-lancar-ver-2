@@ -165,6 +165,28 @@ export default function Dashboard() {
     return ((omset - modal) / modal) * 100;
   }, [monthlyData?.total_modal, monthlyData?.total_omset]);
 
+  // ===== YEARLY DERIVED VALUES =====
+  // Komisi tahunan = bonus tahunan 0.8% × total omset (BUKAN penjumlahan komisi bulanan)
+  const yearlyBonusCommission = useMemo(() => {
+    const omset = yearlyFinancial?.total_omset ?? 0;
+    return (omset * YEARLY_BONUS_PERCENTAGE) / 100;
+  }, [yearlyFinancial?.total_omset]);
+
+  // Margin kotor tahunan: (omset - modal) / modal * 100
+  const yearlyGrossProfitMargin = useMemo(() => {
+    const modal = yearlyFinancial?.total_modal ?? 0;
+    const omset = yearlyFinancial?.total_omset ?? 0;
+    if (modal <= 0) return 0;
+    return ((omset - modal) / modal) * 100;
+  }, [yearlyFinancial?.total_modal, yearlyFinancial?.total_omset]);
+
+  // Keuntungan bersih tahunan: gross profit − komisi tahunan (0.8%) − biaya operasional
+  const yearlyNetProfit = useMemo(() => {
+    const profit = yearlyFinancial?.total_profit ?? 0;
+    const expenses = yearlyFinancial?.total_expenses ?? 0;
+    return profit - yearlyBonusCommission - expenses;
+  }, [yearlyFinancial?.total_profit, yearlyFinancial?.total_expenses, yearlyBonusCommission]);
+
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
   // Month navigation
