@@ -68,6 +68,7 @@ export function DailyProfitList() {
         profit_per_coupon: number;
         modal_per_coupon: number;
         omset_per_coupon: number;
+        daily_installment_amount: number;
       }
     >();
     (contracts || []).forEach((c: any) => {
@@ -85,6 +86,7 @@ export function DailyProfitList() {
         profit_per_coupon: profitTotal / tenor,
         modal_per_coupon: modalTotal / tenor,
         omset_per_coupon: omsetTotal / tenor,
+        daily_installment_amount: Number(c.daily_installment_amount || 0),
       });
     });
     return map;
@@ -100,6 +102,7 @@ export function DailyProfitList() {
         contract_ref: string;
         customer_name: string;
         coupons_paid: number;
+        total_tagihan: number;
         collected: number;
         modal_portion: number;
         profit_portion: number;
@@ -114,11 +117,13 @@ export function DailyProfitList() {
         contract_ref: info.contract_ref,
         customer_name: info.customer_name,
         coupons_paid: 0,
+        total_tagihan: 0,
         collected: 0,
         modal_portion: 0,
         profit_portion: 0,
       };
       existing.coupons_paid += 1;
+      existing.total_tagihan += info.daily_installment_amount;
       existing.collected += Number(p.amount_paid || 0);
       existing.modal_portion += info.modal_per_coupon;
       existing.profit_portion += info.profit_per_coupon;
@@ -133,12 +138,13 @@ export function DailyProfitList() {
     return dailyRows.reduce(
       (acc, r) => {
         acc.coupons += r.coupons_paid;
+        acc.tagihan += r.total_tagihan;
         acc.collected += r.collected;
         acc.modal += r.modal_portion;
         acc.profit += r.profit_portion;
         return acc;
       },
-      { coupons: 0, collected: 0, modal: 0, profit: 0 }
+      { coupons: 0, tagihan: 0, collected: 0, modal: 0, profit: 0 }
     );
   }, [dailyRows]);
 
@@ -343,6 +349,7 @@ export function DailyProfitList() {
                         <TableHead>Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
                         <TableHead className="text-center">Kupon</TableHead>
+                        <TableHead className="text-right">Total Tagihan</TableHead>
                         <TableHead className="text-right">Tertagih</TableHead>
                         <TableHead className="text-right">Modal</TableHead>
                         <TableHead className="text-right">Keuntungan</TableHead>
@@ -352,13 +359,13 @@ export function DailyProfitList() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                           Memuat data...
                         </TableCell>
                       </TableRow>
                     ) : dailyRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                           Tidak ada pembayaran pada tanggal ini.
                         </TableCell>
                       </TableRow>
@@ -372,6 +379,7 @@ export function DailyProfitList() {
                             <TableCell className="text-center">
                               <Badge variant="secondary">{r.coupons_paid}</Badge>
                             </TableCell>
+                            <TableCell className="text-right text-muted-foreground">{formatRupiah(r.total_tagihan)}</TableCell>
                             <TableCell className="text-right">{formatRupiah(r.collected)}</TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {formatRupiah(r.modal_portion)}

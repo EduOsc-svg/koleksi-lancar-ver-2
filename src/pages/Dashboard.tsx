@@ -48,7 +48,8 @@ import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChar
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
 import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
 import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
-import { useCollectorSalaryTotal } from "@/hooks/useCollectorSalaries";
+import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from "@/hooks/useCollectorSalaries";
+import { YEARLY_BONUS_PERCENTAGE } from "@/hooks/useCommissionTiers";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -83,6 +84,7 @@ export default function Dashboard() {
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
+  const collectorSalaryTotalYearly = useCollectorSalaryTotalYearly(selectedYear);
   const { promptAdminNote } = useAdminNote();
   
   // Pagination for sales agent performance table
@@ -162,6 +164,28 @@ export default function Dashboard() {
     if (modal <= 0) return 0;
     return ((omset - modal) / modal) * 100;
   }, [monthlyData?.total_modal, monthlyData?.total_omset]);
+
+  // ===== YEARLY DERIVED VALUES =====
+  // Komisi tahunan = bonus tahunan 0.8% × total omset (BUKAN penjumlahan komisi bulanan)
+  const yearlyBonusCommission = useMemo(() => {
+    const omset = yearlyFinancial?.total_omset ?? 0;
+    return (omset * YEARLY_BONUS_PERCENTAGE) / 100;
+  }, [yearlyFinancial?.total_omset]);
+
+  // Margin kotor tahunan: (omset - modal) / modal * 100
+  const yearlyGrossProfitMargin = useMemo(() => {
+    const modal = yearlyFinancial?.total_modal ?? 0;
+    const omset = yearlyFinancial?.total_omset ?? 0;
+    if (modal <= 0) return 0;
+    return ((omset - modal) / modal) * 100;
+  }, [yearlyFinancial?.total_modal, yearlyFinancial?.total_omset]);
+
+  // Keuntungan bersih tahunan: gross profit − komisi tahunan (0.8%) − biaya operasional
+  const yearlyNetProfit = useMemo(() => {
+    const profit = yearlyFinancial?.total_profit ?? 0;
+    const expenses = yearlyFinancial?.total_expenses ?? 0;
+    return profit - yearlyBonusCommission - expenses;
+  }, [yearlyFinancial?.total_profit, yearlyFinancial?.total_expenses, yearlyBonusCommission]);
 
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
@@ -655,21 +679,42 @@ export default function Dashboard() {
                 />
 
                 <StatCard
+                  icon={CircleDollarSign}
+                  iconColor="text-emerald-500"
+                  label="Margin Kotor"
+                  value={yearlyGrossProfitMargin}
+                  isPercentage
+                  valueColor={yearlyGrossProfitMargin >= 0 ? 'text-green-600' : 'text-destructive'}
+                  subtitle="(Omset − Modal) / Modal"
+                  hoverInfo="Persentase markup tahunan dari modal."
+                />
+
+                <StatCard
                   icon={Percent}
                   iconColor="text-purple-500"
                   label="Total Komisi"
-                  value={yearlyFinancial?.total_commission ?? 0}
+                  value={yearlyBonusCommission}
                   valueColor="text-purple-600"
-                  subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_commission ?? 0)} | Dari ${yearlyFinancial?.contracts_count ?? 0} kontrak`}
+                  subtitle={`Bonus tahunan ${YEARLY_BONUS_PERCENTAGE}% × Omset`}
+                  hoverInfo={`Komisi tahunan dihitung dari ${YEARLY_BONUS_PERCENTAGE}% × Total Omset tahun ${selectedYear.getFullYear()} (bukan akumulasi komisi bulanan).`}
                 />
 
                 <StatCard
                   icon={CheckCircle}
                   iconColor="text-teal-500"
+                  label="Tertagih"
+                  value={yearlyFinancial?.total_collected ?? 0}
+                  valueColor="text-teal-600"
+                  subtitle={`Pembayaran masuk tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total uang yang benar-benar tertagih (cash inflow) sepanjang tahun ${selectedYear.getFullYear()}.`}
+                />
+
+                <StatCard
+                  icon={Wallet}
+                  iconColor="text-red-500"
                   label="Sisa Tagihan"
                   value={yearlyFinancial?.total_to_collect ?? 0}
-                  valueColor="text-teal-600"
+                  valueColor="text-red-600"
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Sisa tagihan per kontrak tahun ini: Total Kontrak − Total Pembayaran (ALL TIME). Total sisa: ${formatRupiah(yearlyFinancial?.total_to_collect ?? 0)}\n\nKlik Detail untuk lihat per sales & per kontrak.`}
                   onDetailClick={() => { setOutstandingDetailScope('yearly'); setOutstandingDetailOpen(true); }}
@@ -684,6 +729,17 @@ export default function Dashboard() {
                   isNegative
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
                   hoverInfo={`Total: ${formatRupiah(yearlyFinancial?.total_expenses ?? 0)} | Biaya operasional tahun ${selectedYear.getFullYear()}`}
+                />
+
+                <StatCard
+                  icon={Users}
+                  iconColor="text-cyan-500"
+                  label="Gaji Kolektor"
+                  value={collectorSalaryTotalYearly}
+                  valueColor="text-cyan-600"
+                  isNegative
+                  subtitle={`Total gaji tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo="Total gaji semua kolektor sepanjang tahun. Sudah termasuk dalam Biaya Operasional (kategori: Gaji Kolektor)."
                 />
 
                 <StatCard
@@ -710,6 +766,27 @@ export default function Dashboard() {
                 />
 
               </div>
+
+              {/* Yearly Net Profit Card */}
+              <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Keuntungan Bersih Tahunan</p>
+                      <p className={`text-3xl font-bold ${yearlyNetProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {formatRupiah(yearlyNetProfit)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Keuntungan Kotor − Komisi Tahunan ({YEARLY_BONUS_PERCENTAGE}%) − Biaya Operasional
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Periode</p>
+                      <p className="font-medium">Tahun {selectedYear.getFullYear()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Monthly Breakdown Chart */}
               <div>
@@ -794,6 +871,8 @@ export default function Dashboard() {
                           const profitMargin = agent.total_modal > 0 
                             ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
+                          // Komisi tahunan = bonus tahunan 0.8% × omset agen
+                          const yearlyAgentCommission = (agent.total_omset * YEARLY_BONUS_PERCENTAGE) / 100;
                           return (
                             <TableRow 
                               key={agent.agent_id}
@@ -808,14 +887,14 @@ export default function Dashboard() {
                               <TableCell>
                                 <div>
                                   <p className="font-medium">{agent.agent_code}</p>
-                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak</p>
+                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak • {YEARLY_BONUS_PERCENTAGE}%</p>
                                 </div>
                               </TableCell>
                               <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
                               <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
                               <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
                               <TableCell className="text-right text-emerald-600">{profitMargin.toFixed(1)}%</TableCell>
-                              <TableCell className="text-right text-purple-600">{formatRupiah(agent.total_commission)}</TableCell>
+                              <TableCell className="text-right text-purple-600">{formatRupiah(yearlyAgentCommission)}</TableCell>
                               <TableCell>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </TableCell>

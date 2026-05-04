@@ -113,6 +113,7 @@ export function CollectorDailyPerformance() {
                     <TableHead className="text-right">Kupon Dipegang</TableHead>
                     <TableHead className="text-right">Kupon Tertagih</TableHead>
                     <TableHead className="text-right">Kontrak</TableHead>
+                    <TableHead className="text-right">Total Tagihan</TableHead>
                     <TableHead className="text-right">Total Tertagih</TableHead>
                     <TableHead className="w-48">Keberhasilan</TableHead>
                     <TableHead>Status</TableHead>
@@ -120,9 +121,9 @@ export function CollectorDailyPerformance() {
                 </TableHeader>
                 <TableBody>
                   {dailyLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Memuat...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Memuat...</TableCell></TableRow>
                   ) : (daily?.rows.length || 0) === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Tidak ada aktivitas kolektor di tanggal ini</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Tidak ada aktivitas kolektor di tanggal ini</TableCell></TableRow>
                   ) : (
                     daily!.rows.map((r) => (
                       <TableRow key={r.collector_id}>
@@ -131,6 +132,7 @@ export function CollectorDailyPerformance() {
                         <TableCell className="text-right">{r.coupons_handed_over}</TableCell>
                         <TableCell className="text-right">{r.coupons_collected}</TableCell>
                         <TableCell className="text-right">{r.unique_contracts}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{formatRupiah(r.amount_handed)}</TableCell>
                         <TableCell className="text-right font-semibold">{formatRupiah(r.amount_collected)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -213,6 +215,7 @@ export function CollectorDailyPerformance() {
                     <TableHead className="text-right">Kupon Dipegang</TableHead>
                     <TableHead className="text-right">Kupon Tertagih</TableHead>
                     <TableHead className="text-right">Kontrak</TableHead>
+                    <TableHead className="text-right">Total Tagihan</TableHead>
                     <TableHead className="text-right">Total Tertagih</TableHead>
                     <TableHead className="w-48">Keberhasilan</TableHead>
                     <TableHead>Status</TableHead>
@@ -220,9 +223,9 @@ export function CollectorDailyPerformance() {
                 </TableHeader>
                 <TableBody>
                   {monthlyLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Memuat...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Memuat...</TableCell></TableRow>
                   ) : (monthly?.rows.length || 0) === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Tidak ada aktivitas kolektor di bulan ini</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Tidak ada aktivitas kolektor di bulan ini</TableCell></TableRow>
                   ) : (
                     monthly!.rows.map((r) => (
                       <TableRow key={r.collector_id}>
@@ -232,6 +235,7 @@ export function CollectorDailyPerformance() {
                         <TableCell className="text-right">{r.coupons_handed_over}</TableCell>
                         <TableCell className="text-right">{r.coupons_collected}</TableCell>
                         <TableCell className="text-right">{r.unique_contracts}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{formatRupiah(r.amount_handed)}</TableCell>
                         <TableCell className="text-right font-semibold">{formatRupiah(r.amount_collected)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
