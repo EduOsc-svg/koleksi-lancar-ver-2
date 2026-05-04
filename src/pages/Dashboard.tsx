@@ -48,7 +48,8 @@ import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChar
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
 import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
 import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
-import { useCollectorSalaryTotal } from "@/hooks/useCollectorSalaries";
+import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from "@/hooks/useCollectorSalaries";
+import { YEARLY_BONUS_PERCENTAGE } from "@/hooks/useCommissionTiers";
 import { toast } from "sonner";
 
 export default function Dashboard() {
