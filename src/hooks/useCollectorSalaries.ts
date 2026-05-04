@@ -77,6 +77,29 @@ export const useCollectorSalaryTotal = (month: Date = new Date()) => {
   return total;
 };
 
+// Total gaji kolektor untuk satu tahun terpilih
+export const useCollectorSalaryTotalYearly = (year: Date = new Date()) => {
+  const yearNum = year.getFullYear();
+  const yearStart = `${yearNum}-01-01`;
+  const yearEnd = `${yearNum}-12-31`;
+
+  const { data } = useQuery({
+    queryKey: ['collector_salaries_yearly', yearStart, yearEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('operational_expenses')
+        .select('amount')
+        .eq('category', CATEGORY)
+        .gte('expense_date', yearStart)
+        .lte('expense_date', yearEnd);
+      if (error) throw error;
+      return (data || []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
+    },
+  });
+
+  return data ?? 0;
+};
+
 // Set/upsert gaji kolektor untuk bulan tertentu
 export const useSetCollectorSalary = () => {
   const queryClient = useQueryClient();
