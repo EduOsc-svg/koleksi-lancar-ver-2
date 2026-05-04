@@ -18,6 +18,7 @@ import { id } from "date-fns/locale";
 interface DailyProfit {
   date: string;
   coupons: number;
+  tagihan: number;
   collected: number;
   modal: number;
   profit: number;
@@ -161,6 +162,7 @@ export function DailyProfitList() {
       map.set(dateStr, {
         date: dateStr,
         coupons: 0,
+        tagihan: 0,
         collected: 0,
         modal: 0,
         profit: 0,
@@ -179,6 +181,7 @@ export function DailyProfitList() {
 
       const amount = Number(p.amount_paid || 0);
       daily.coupons += 1;
+      daily.tagihan += info.daily_installment_amount;
       daily.collected += amount;
       daily.modal += info.modal_per_coupon;
       daily.profit += info.profit_per_coupon;
@@ -210,6 +213,7 @@ export function DailyProfitList() {
   // MONTHLY VIEW: Summary
   const monthlySummary = useMemo(() => {
     let totalCoupons = 0,
+      totalTagihan = 0,
       totalCollected = 0,
       totalModal = 0,
       totalProfit = 0,
@@ -218,6 +222,7 @@ export function DailyProfitList() {
     monthlyDailyProfits.forEach((daily) => {
       if (daily.profit > 0 || daily.coupons > 0) totalDays += 1;
       totalCoupons += daily.coupons;
+      totalTagihan += daily.tagihan;
       totalCollected += daily.collected;
       totalModal += daily.modal;
       totalProfit += daily.profit;
@@ -226,7 +231,7 @@ export function DailyProfitList() {
     const avgDaily = totalDays > 0 ? totalProfit / totalDays : 0;
     const margin = totalCollected > 0 ? (totalProfit / totalCollected) * 100 : 0;
 
-    return { totalCoupons, totalCollected, totalModal, totalProfit, totalDays, avgDaily, margin };
+    return { totalCoupons, totalTagihan, totalCollected, totalModal, totalProfit, totalDays, avgDaily, margin };
   }, [monthlyDailyProfits]);
 
   // Get max daily profit for color coding
@@ -449,7 +454,7 @@ export function DailyProfitList() {
           </Card>
 
           {/* Monthly Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -467,6 +472,15 @@ export function DailyProfitList() {
                 </div>
                 <div className="text-2xl font-bold">{monthlySummary.totalDays}</div>
                 <div className="text-xs text-muted-foreground mt-1">dari {days.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                  <Wallet className="h-4 w-4" />
+                  Total Tagihan
+                </div>
+                <div className="text-2xl font-bold">{formatRupiah(monthlySummary.totalTagihan)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -554,6 +568,7 @@ export function DailyProfitList() {
                       const daily = monthlyDailyProfits.get(dateStr) || {
                         date: dateStr,
                         coupons: 0,
+                        tagihan: 0,
                         collected: 0,
                         modal: 0,
                         profit: 0,
