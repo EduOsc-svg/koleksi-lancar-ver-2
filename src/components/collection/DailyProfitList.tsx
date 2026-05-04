@@ -181,6 +181,7 @@ export function DailyProfitList() {
 
       const amount = Number(p.amount_paid || 0);
       daily.coupons += 1;
+      daily.tagihan += info.daily_installment_amount;
       daily.collected += amount;
       daily.modal += info.modal_per_coupon;
       daily.profit += info.profit_per_coupon;
