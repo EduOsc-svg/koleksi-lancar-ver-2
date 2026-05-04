@@ -349,6 +349,7 @@ export function DailyProfitList() {
                         <TableHead>Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
                         <TableHead className="text-center">Kupon</TableHead>
+                        <TableHead className="text-right">Total Tagihan</TableHead>
                         <TableHead className="text-right">Tertagih</TableHead>
                         <TableHead className="text-right">Modal</TableHead>
                         <TableHead className="text-right">Keuntungan</TableHead>
@@ -358,13 +359,13 @@ export function DailyProfitList() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                           Memuat data...
                         </TableCell>
                       </TableRow>
                     ) : dailyRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                           Tidak ada pembayaran pada tanggal ini.
                         </TableCell>
                       </TableRow>
@@ -378,6 +379,7 @@ export function DailyProfitList() {
                             <TableCell className="text-center">
                               <Badge variant="secondary">{r.coupons_paid}</Badge>
                             </TableCell>
+                            <TableCell className="text-right text-muted-foreground">{formatRupiah(r.total_tagihan)}</TableCell>
                             <TableCell className="text-right">{formatRupiah(r.collected)}</TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {formatRupiah(r.modal_portion)}
