@@ -887,7 +887,7 @@ export default function Dashboard() {
                               <TableCell>
                                 <div>
                                   <p className="font-medium">{agent.agent_code}</p>
-                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak</p>
+                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak • {YEARLY_BONUS_PERCENTAGE}%</p>
                                 </div>
                               </TableCell>
                               <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
