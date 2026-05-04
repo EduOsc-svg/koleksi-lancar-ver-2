@@ -18,6 +18,7 @@ import { id } from "date-fns/locale";
 interface DailyProfit {
   date: string;
   coupons: number;
+  tagihan: number;
   collected: number;
   modal: number;
   profit: number;
