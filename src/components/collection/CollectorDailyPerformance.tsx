@@ -186,11 +186,17 @@ export function CollectorDailyPerformance() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <Card>
                 <CardContent className="p-4">
                   <div className="text-muted-foreground text-sm">Total Tertagih</div>
                   <div className="text-xl font-bold mt-1">{formatRupiah(monthly?.total_amount || 0)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-muted-foreground text-sm">Total Tagihan</div>
+                  <div className="text-xl font-bold mt-1">{formatRupiah(monthly?.total_handed_amount || 0)}</div>
                 </CardContent>
               </Card>
               <Card>
