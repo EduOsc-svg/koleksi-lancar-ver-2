@@ -138,12 +138,13 @@ export function DailyProfitList() {
     return dailyRows.reduce(
       (acc, r) => {
         acc.coupons += r.coupons_paid;
+        acc.tagihan += r.total_tagihan;
         acc.collected += r.collected;
         acc.modal += r.modal_portion;
         acc.profit += r.profit_portion;
         return acc;
       },
-      { coupons: 0, collected: 0, modal: 0, profit: 0 }
+      { coupons: 0, tagihan: 0, collected: 0, modal: 0, profit: 0 }
     );
   }, [dailyRows]);
 
