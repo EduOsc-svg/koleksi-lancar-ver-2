@@ -67,13 +67,21 @@ export function CollectorDailyPerformance() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Coins className="h-4 w-4" /> Total Tertagih
                   </div>
                   <div className="text-xl font-bold mt-1">{formatRupiah(daily?.total_amount || 0)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Target className="h-4 w-4" /> Total Tagihan
+                  </div>
+                  <div className="text-xl font-bold mt-1">{formatRupiah(daily?.total_handed_amount || 0)}</div>
                 </CardContent>
               </Card>
               <Card>
@@ -178,11 +186,17 @@ export function CollectorDailyPerformance() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <Card>
                 <CardContent className="p-4">
                   <div className="text-muted-foreground text-sm">Total Tertagih</div>
                   <div className="text-xl font-bold mt-1">{formatRupiah(monthly?.total_amount || 0)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-muted-foreground text-sm">Total Tagihan</div>
+                  <div className="text-xl font-bold mt-1">{formatRupiah(monthly?.total_handed_amount || 0)}</div>
                 </CardContent>
               </Card>
               <Card>
