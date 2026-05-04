@@ -213,6 +213,7 @@ export function DailyProfitList() {
   // MONTHLY VIEW: Summary
   const monthlySummary = useMemo(() => {
     let totalCoupons = 0,
+      totalTagihan = 0,
       totalCollected = 0,
       totalModal = 0,
       totalProfit = 0,
@@ -221,6 +222,7 @@ export function DailyProfitList() {
     monthlyDailyProfits.forEach((daily) => {
       if (daily.profit > 0 || daily.coupons > 0) totalDays += 1;
       totalCoupons += daily.coupons;
+      totalTagihan += daily.tagihan;
       totalCollected += daily.collected;
       totalModal += daily.modal;
       totalProfit += daily.profit;
@@ -229,7 +231,7 @@ export function DailyProfitList() {
     const avgDaily = totalDays > 0 ? totalProfit / totalDays : 0;
     const margin = totalCollected > 0 ? (totalProfit / totalCollected) * 100 : 0;
 
-    return { totalCoupons, totalCollected, totalModal, totalProfit, totalDays, avgDaily, margin };
+    return { totalCoupons, totalTagihan, totalCollected, totalModal, totalProfit, totalDays, avgDaily, margin };
   }, [monthlyDailyProfits]);
 
   // Get max daily profit for color coding
