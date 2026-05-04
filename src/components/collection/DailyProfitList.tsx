@@ -454,7 +454,7 @@ export function DailyProfitList() {
           </Card>
 
           {/* Monthly Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -472,6 +472,15 @@ export function DailyProfitList() {
                 </div>
                 <div className="text-2xl font-bold">{monthlySummary.totalDays}</div>
                 <div className="text-xs text-muted-foreground mt-1">dari {days.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                  <Wallet className="h-4 w-4" />
+                  Total Tagihan
+                </div>
+                <div className="text-2xl font-bold">{formatRupiah(monthlySummary.totalTagihan)}</div>
               </CardContent>
             </Card>
             <Card>
