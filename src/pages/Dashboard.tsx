@@ -894,7 +894,7 @@ export default function Dashboard() {
                               <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
                               <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
                               <TableCell className="text-right text-emerald-600">{profitMargin.toFixed(1)}%</TableCell>
-                              <TableCell className="text-right text-purple-600">{formatRupiah(agent.total_commission)}</TableCell>
+                              <TableCell className="text-right text-purple-600">{formatRupiah(yearlyAgentCommission)}</TableCell>
                               <TableCell>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </TableCell>
