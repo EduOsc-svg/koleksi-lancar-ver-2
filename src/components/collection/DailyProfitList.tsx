@@ -162,6 +162,7 @@ export function DailyProfitList() {
       map.set(dateStr, {
         date: dateStr,
         coupons: 0,
+        tagihan: 0,
         collected: 0,
         modal: 0,
         profit: 0,
