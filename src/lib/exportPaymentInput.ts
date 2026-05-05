@@ -14,10 +14,10 @@ interface BulkPaymentSummary {
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'Jumlah Pembayaran', 'Jumlah Kupon', 'Angsuran', 'Total Tertagih (Rp)', 'Status'
+  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran ke', 'Kupon Bawa', 'Kupon Pulang', 'Angsuran/Kupon (Rp)', 'Tertagih (Rp)'
 ];
 
-const COL_WIDTHS = [5, 30, 16, 16, 12, 14, 18, 12];
+const COL_WIDTHS = [5, 30, 16, 14, 12, 12, 18, 18];
 
 /**
  * Export pembayaran dengan pencatatan lengkap semua handover (termasuk yang sudah lunas)
