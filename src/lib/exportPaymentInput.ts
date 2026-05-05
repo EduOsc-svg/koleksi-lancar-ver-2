@@ -55,7 +55,7 @@ export const exportPaymentInputToExcel = async (
   const sheet = workbook.addWorksheet('Input Pembayaran');
 
   // Title
-  sheet.mergeCells('A1:G1');
+  sheet.mergeCells('A1:H1');
   const titleCell = sheet.getCell('A1');
   titleCell.value = 'LAPORAN INPUT PEMBAYARAN (BULK)';
   titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
@@ -63,7 +63,7 @@ export const exportPaymentInputToExcel = async (
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
   // Date info
-  sheet.mergeCells('A2:G2');
+  sheet.mergeCells('A2:H2');
   const dateCell = sheet.getCell('A2');
   dateCell.value = `Per tanggal: ${exportDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   dateCell.font = { italic: true, size: 12 };
