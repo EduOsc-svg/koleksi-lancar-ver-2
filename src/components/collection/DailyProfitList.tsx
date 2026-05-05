@@ -43,6 +43,7 @@ export function DailyProfitList() {
 
   // Daily view data
   const { data: dailyPayments, isLoading: dailyLoading } = usePayments(selectedDate, selectedDate);
+  const { data: dailyHandovers } = useCouponHandovers(selectedDate);
 
   // Monthly view data
   const monthStart = startOfMonth(currentMonth);
