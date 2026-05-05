@@ -95,6 +95,15 @@ export function DailyProfitList() {
     return map;
   }, [contracts]);
 
+  // Build handover map for selected date: contract_id -> total KB
+  const dailyHandoverMap = useMemo(() => {
+    const m = new Map<string, number>();
+    (dailyHandovers || []).forEach((h: any) => {
+      m.set(h.contract_id, (m.get(h.contract_id) || 0) + (h.coupon_count || 0));
+    });
+    return m;
+  }, [dailyHandovers]);
+
   // DAILY VIEW: Aggregate per contract for selected date
   const dailyRows = useMemo(() => {
     if (!dailyPayments) return [];
@@ -104,6 +113,8 @@ export function DailyProfitList() {
         contract_id: string;
         contract_ref: string;
         customer_name: string;
+        kupon_bawa: number;
+        kupon_pulang: number;
         coupons_paid: number;
         total_tagihan: number;
         collected: number;
@@ -119,6 +130,8 @@ export function DailyProfitList() {
         contract_id: p.contract_id,
         contract_ref: info.contract_ref,
         customer_name: info.customer_name,
+        kupon_bawa: 0,
+        kupon_pulang: 0,
         coupons_paid: 0,
         total_tagihan: 0,
         collected: 0,
@@ -133,8 +146,34 @@ export function DailyProfitList() {
       grouped.set(p.contract_id, existing);
     });
 
+    // Add handover-only rows (KB but no payment) and fill KB/KP
+    dailyHandoverMap.forEach((kb, contractId) => {
+      const info = contractMap.get(contractId);
+      if (!info) return;
+      if (!grouped.has(contractId)) {
+        grouped.set(contractId, {
+          contract_id: contractId,
+          contract_ref: info.contract_ref,
+          customer_name: info.customer_name,
+          kupon_bawa: kb,
+          kupon_pulang: kb,
+          coupons_paid: 0,
+          total_tagihan: kb * info.daily_installment_amount,
+          collected: 0,
+          modal_portion: 0,
+          profit_portion: 0,
+        });
+      } else {
+        const r = grouped.get(contractId)!;
+        r.kupon_bawa = kb;
+        r.kupon_pulang = Math.max(0, kb - r.coupons_paid);
+        // Override total_tagihan to KB-based
+        r.total_tagihan = kb * info.daily_installment_amount;
+      }
+    });
+
     return Array.from(grouped.values()).sort((a, b) => b.profit_portion - a.profit_portion);
-  }, [dailyPayments, contractMap]);
+  }, [dailyPayments, contractMap, dailyHandoverMap]);
 
   // DAILY VIEW: Summary
   const dailyTotals = useMemo(() => {
