@@ -6,11 +6,11 @@ interface BulkPaymentSummary {
   contractId: string;
   customerName: string;
   contractRef: string;
-  paymentCount: number;
-  totalCoupons: number;
+  paymentCount: number; // Pembayaran ke / kupon dibayar
+  totalCoupons: number; // Kupon Bawa (handover)
+  unpaidCount: number;  // Kupon Pulang (sisa belum tertagih)
   dailyAmount: number;
-  totalAmount: number;
-  status: 'unpaid' | 'partial' | 'paid'; // Status tracking
+  totalAmount: number;  // Tertagih
 }
 
 const HEADERS = [
