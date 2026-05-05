@@ -274,8 +274,8 @@ export default function Contracts() {
 
   const handleOpenEdit = (contract: ContractWithCustomer) => {
     if (hasTransactions(contract)) {
-      toast.error("Kontrak tidak dapat diedit karena sudah ada transaksi pembayaran");
-      return;
+      // Allow editing even if there are transactions, but warn the user
+      toast.warning("Perhatian: kontrak ini sudah memiliki transaksi. Pastikan perubahan tidak merusak data pembayaran yang ada.");
     }
     setSelectedContract(contract);
     setFormData({
@@ -948,8 +948,7 @@ export default function Contracts() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenEdit(contract)}
-                        disabled={hasTransactions(contract)}
-                        title={hasTransactions(contract) ? "Tidak dapat diedit: kontrak sudah memiliki transaksi" : "Edit"}
+                        title={hasTransactions(contract) ? "Edit (kontrak sudah memiliki transaksi)" : "Edit"}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
