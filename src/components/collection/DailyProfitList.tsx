@@ -402,34 +402,40 @@ export function DailyProfitList() {
                       <TableRow>
                         <TableHead>Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
-                        <TableHead className="text-center">Kupon</TableHead>
+                        <TableHead className="text-center">KB</TableHead>
+                        <TableHead className="text-center">KP</TableHead>
+                        <TableHead className="text-center">Kupon dibayar</TableHead>
                         <TableHead className="text-right">Total Tagihan</TableHead>
                         <TableHead className="text-right">Tertagih</TableHead>
                         <TableHead className="text-right">Modal</TableHead>
                         <TableHead className="text-right">Keuntungan</TableHead>
-                        <TableHead className="text-right">Margin</TableHead>
                       </TableRow>
                     </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                           Memuat data...
                         </TableCell>
                       </TableRow>
                     ) : dailyRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                           Tidak ada pembayaran pada tanggal ini.
                         </TableCell>
                       </TableRow>
                     ) : (
                       dailyRows.map((r) => {
-                        const m = r.collected > 0 ? (r.profit_portion / r.collected) * 100 : 0;
                         return (
                           <TableRow key={r.contract_id}>
                             <TableCell className="font-mono text-xs">{r.contract_ref}</TableCell>
                             <TableCell>{r.customer_name}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline">{r.kupon_bawa}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={r.kupon_pulang > 0 ? "destructive" : "outline"}>{r.kupon_pulang}</Badge>
+                            </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary">{r.coupons_paid}</Badge>
                             </TableCell>
@@ -441,7 +447,6 @@ export function DailyProfitList() {
                             <TableCell className="text-right font-semibold text-primary">
                               {formatRupiah(r.profit_portion)}
                             </TableCell>
-                            <TableCell className="text-right text-xs">{m.toFixed(1)}%</TableCell>
                           </TableRow>
                         );
                       })
