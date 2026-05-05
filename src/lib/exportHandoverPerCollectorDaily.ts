@@ -32,7 +32,7 @@ interface CollectorDailySummary {
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Sisa Kupon', 'Angsuran/Kupon (Rp)', 'Total Sisa (Rp)'
+  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Kupon Bawa', 'Angsuran/Kupon (Rp)', 'Total (Rp)'
 ];
 
 const COL_WIDTHS = [5, 30, 16, 14, 12, 18, 18];

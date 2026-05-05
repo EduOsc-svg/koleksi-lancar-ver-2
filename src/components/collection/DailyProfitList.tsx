@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { TrendingUp, Wallet, Coins, Receipt, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePayments } from "@/hooks/usePayments";
 import { useContracts } from "@/hooks/useContracts";
+import { useCouponHandovers } from "@/hooks/useCouponHandovers";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths } from "date-fns";
 import { id } from "date-fns/locale";
@@ -42,6 +43,7 @@ export function DailyProfitList() {
 
   // Daily view data
   const { data: dailyPayments, isLoading: dailyLoading } = usePayments(selectedDate, selectedDate);
+  const { data: dailyHandovers } = useCouponHandovers(selectedDate);
 
   // Monthly view data
   const monthStart = startOfMonth(currentMonth);
@@ -93,6 +95,15 @@ export function DailyProfitList() {
     return map;
   }, [contracts]);
 
+  // Build handover map for selected date: contract_id -> total KB
+  const dailyHandoverMap = useMemo(() => {
+    const m = new Map<string, number>();
+    (dailyHandovers || []).forEach((h: any) => {
+      m.set(h.contract_id, (m.get(h.contract_id) || 0) + (h.coupon_count || 0));
+    });
+    return m;
+  }, [dailyHandovers]);
+
   // DAILY VIEW: Aggregate per contract for selected date
   const dailyRows = useMemo(() => {
     if (!dailyPayments) return [];
@@ -102,6 +113,8 @@ export function DailyProfitList() {
         contract_id: string;
         contract_ref: string;
         customer_name: string;
+        kupon_bawa: number;
+        kupon_pulang: number;
         coupons_paid: number;
         total_tagihan: number;
         collected: number;
@@ -117,6 +130,8 @@ export function DailyProfitList() {
         contract_id: p.contract_id,
         contract_ref: info.contract_ref,
         customer_name: info.customer_name,
+        kupon_bawa: 0,
+        kupon_pulang: 0,
         coupons_paid: 0,
         total_tagihan: 0,
         collected: 0,
@@ -131,8 +146,34 @@ export function DailyProfitList() {
       grouped.set(p.contract_id, existing);
     });
 
+    // Add handover-only rows (KB but no payment) and fill KB/KP
+    dailyHandoverMap.forEach((kb, contractId) => {
+      const info = contractMap.get(contractId);
+      if (!info) return;
+      if (!grouped.has(contractId)) {
+        grouped.set(contractId, {
+          contract_id: contractId,
+          contract_ref: info.contract_ref,
+          customer_name: info.customer_name,
+          kupon_bawa: kb,
+          kupon_pulang: kb,
+          coupons_paid: 0,
+          total_tagihan: kb * info.daily_installment_amount,
+          collected: 0,
+          modal_portion: 0,
+          profit_portion: 0,
+        });
+      } else {
+        const r = grouped.get(contractId)!;
+        r.kupon_bawa = kb;
+        r.kupon_pulang = Math.max(0, kb - r.coupons_paid);
+        // Override total_tagihan to KB-based
+        r.total_tagihan = kb * info.daily_installment_amount;
+      }
+    });
+
     return Array.from(grouped.values()).sort((a, b) => b.profit_portion - a.profit_portion);
-  }, [dailyPayments, contractMap]);
+  }, [dailyPayments, contractMap, dailyHandoverMap]);
 
   // DAILY VIEW: Summary
   const dailyTotals = useMemo(() => {
@@ -361,34 +402,40 @@ export function DailyProfitList() {
                       <TableRow>
                         <TableHead>Kontrak</TableHead>
                         <TableHead>Pelanggan</TableHead>
-                        <TableHead className="text-center">Kupon</TableHead>
+                        <TableHead className="text-center">KB</TableHead>
+                        <TableHead className="text-center">KP</TableHead>
+                        <TableHead className="text-center">Kupon dibayar</TableHead>
                         <TableHead className="text-right">Total Tagihan</TableHead>
                         <TableHead className="text-right">Tertagih</TableHead>
                         <TableHead className="text-right">Modal</TableHead>
                         <TableHead className="text-right">Keuntungan</TableHead>
-                        <TableHead className="text-right">Margin</TableHead>
                       </TableRow>
                     </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                           Memuat data...
                         </TableCell>
                       </TableRow>
                     ) : dailyRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                           Tidak ada pembayaran pada tanggal ini.
                         </TableCell>
                       </TableRow>
                     ) : (
                       dailyRows.map((r) => {
-                        const m = r.collected > 0 ? (r.profit_portion / r.collected) * 100 : 0;
                         return (
                           <TableRow key={r.contract_id}>
                             <TableCell className="font-mono text-xs">{r.contract_ref}</TableCell>
                             <TableCell>{r.customer_name}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline">{r.kupon_bawa}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={r.kupon_pulang > 0 ? "destructive" : "outline"}>{r.kupon_pulang}</Badge>
+                            </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary">{r.coupons_paid}</Badge>
                             </TableCell>
@@ -400,7 +447,6 @@ export function DailyProfitList() {
                             <TableCell className="text-right font-semibold text-primary">
                               {formatRupiah(r.profit_portion)}
                             </TableCell>
-                            <TableCell className="text-right text-xs">{m.toFixed(1)}%</TableCell>
                           </TableRow>
                         );
                       })

@@ -6,18 +6,18 @@ interface BulkPaymentSummary {
   contractId: string;
   customerName: string;
   contractRef: string;
-  paymentCount: number;
-  totalCoupons: number;
+  paymentCount: number; // Pembayaran ke / kupon dibayar
+  totalCoupons: number; // Kupon Bawa (handover)
+  unpaidCount: number;  // Kupon Pulang (sisa belum tertagih)
   dailyAmount: number;
-  totalAmount: number;
-  status: 'unpaid' | 'partial' | 'paid'; // Status tracking
+  totalAmount: number;  // Tertagih
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'Jumlah Pembayaran', 'Jumlah Kupon', 'Angsuran', 'Total Tertagih (Rp)', 'Status'
+  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran ke', 'Kupon Bawa', 'Kupon Pulang', 'Angsuran/Kupon (Rp)', 'Tertagih (Rp)'
 ];
 
-const COL_WIDTHS = [5, 30, 16, 16, 12, 14, 18, 12];
+const COL_WIDTHS = [5, 30, 16, 14, 12, 12, 18, 18];
 
 /**
  * Export pembayaran dengan pencatatan lengkap semua handover (termasuk yang sudah lunas)
@@ -55,7 +55,7 @@ export const exportPaymentInputToExcel = async (
   const sheet = workbook.addWorksheet('Input Pembayaran');
 
   // Title
-  sheet.mergeCells('A1:G1');
+  sheet.mergeCells('A1:H1');
   const titleCell = sheet.getCell('A1');
   titleCell.value = 'LAPORAN INPUT PEMBAYARAN (BULK)';
   titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
@@ -63,7 +63,7 @@ export const exportPaymentInputToExcel = async (
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
   // Date info
-  sheet.mergeCells('A2:G2');
+  sheet.mergeCells('A2:H2');
   const dateCell = sheet.getCell('A2');
   dateCell.value = `Per tanggal: ${exportDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   dateCell.font = { italic: true, size: 12 };
@@ -94,17 +94,9 @@ export const exportPaymentInputToExcel = async (
       const currentIndex = handover.credit_contracts.current_installment_index || 0;
       const paidCount = Math.max(0, Math.min(currentIndex, handover.end_index) - handover.start_index + 1);
       const unpaidCount = handover.coupon_count - paidCount;
-      
+
       const dailyAmount = handover.credit_contracts.daily_installment_amount || 0;
-      const totalAmount = dailyAmount * handover.coupon_count;
-      
-      // Tentukan status
-      let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-      if (unpaidCount === 0) {
-        status = 'paid';
-      } else if (paidCount > 0) {
-        status = 'partial';
-      }
+      const totalAmount = dailyAmount * paidCount; // Tertagih = kupon dibayar * angsuran
 
       if (!bulkMap.has(key)) {
         bulkMap.set(key, {
@@ -113,9 +105,9 @@ export const exportPaymentInputToExcel = async (
           contractRef: handover.credit_contracts.contract_ref,
           paymentCount: paidCount,
           totalCoupons: handover.coupon_count,
+          unpaidCount,
           dailyAmount,
           totalAmount,
-          status,
         });
       }
     });
@@ -135,26 +127,26 @@ export const exportPaymentInputToExcel = async (
           contractRef,
           paymentCount: 0,
           totalCoupons: 0,
+          unpaidCount: 0,
           dailyAmount,
           totalAmount: 0,
-          status: 'unpaid',
         });
       }
 
       const summary = bulkMap.get(key)!;
       summary.paymentCount += 1;
-      summary.totalCoupons += 1; // 1 pembayaran = 1 kupon
+      summary.totalCoupons += 1;
       summary.totalAmount += dailyAmount;
-      summary.status = summary.paymentCount === summary.totalCoupons ? 'paid' : 'partial';
     });
   }
 
   // Convert map to array and sort
-  const bulkData = Array.from(bulkMap.values()).sort((a, b) => 
+  const bulkData = Array.from(bulkMap.values()).sort((a, b) =>
     a.contractRef.localeCompare(b.contractRef)
   );
 
   // Build rows from bulk summary
+  // Cols: No | Konsumen | Kode Kontrak | Pembayaran ke | Kupon Bawa | Kupon Pulang | Angsuran/Kupon | Tertagih
   bulkData.forEach((bulk, i) => {
     const dataRowValues = [
       i + 1,
@@ -162,9 +154,9 @@ export const exportPaymentInputToExcel = async (
       bulk.contractRef,
       bulk.paymentCount,
       bulk.totalCoupons,
+      bulk.unpaidCount,
       bulk.dailyAmount,
       bulk.totalAmount,
-      bulk.status.toUpperCase(),
     ];
 
     const dataRow = sheet.addRow(dataRowValues);
@@ -172,27 +164,12 @@ export const exportPaymentInputToExcel = async (
     dataRow.eachCell((cell, colNumber) => {
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-      // Format numeric and currency columns
-      if ([4, 5].includes(colNumber)) {
+      if ([4, 5, 6].includes(colNumber)) {
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'center' };
-      } else if ([6, 7].includes(colNumber)) {
+      } else if ([7, 8].includes(colNumber)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
-      } else if (colNumber === 8) {
-        // Status column
-        cell.alignment = { horizontal: 'center' };
-        // Color code status
-        if (bulk.status === 'paid') {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } }; // Light green
-          cell.font = { color: { argb: 'FF006100' } }; // Dark green
-        } else if (bulk.status === 'partial') {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB9C' } }; // Light yellow
-          cell.font = { color: { argb: 'FF9C6500' } }; // Dark orange
-        } else {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCB' } }; // Light red
-          cell.font = { color: { argb: 'FF9C0006' } }; // Dark red
-        }
       }
     });
   });
@@ -201,10 +178,12 @@ export const exportPaymentInputToExcel = async (
   if (bulkData.length > 0) {
     const endRow = startRow + bulkData.length - 1;
     const totalRowValues = [
-      '', '', 'TOTAL', '', '',
+      '', '', 'TOTAL',
+      { formula: `SUM(D${startRow}:D${endRow})` },
+      { formula: `SUM(E${startRow}:E${endRow})` },
       { formula: `SUM(F${startRow}:F${endRow})` },
-      { formula: `SUM(G${startRow}:G${endRow})` },
-      '', // Status column empty for total
+      '',
+      { formula: `SUM(H${startRow}:H${endRow})` },
     ];
 
     const totalRow = sheet.addRow(totalRowValues);
@@ -213,11 +192,11 @@ export const exportPaymentInputToExcel = async (
       cell.font = { bold: true };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
       cell.border = { top: { style: 'double' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
-      
-      if ([4, 5].includes(colNumber)) {
+
+      if ([4, 5, 6].includes(colNumber)) {
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'center' };
-      } else if ([6, 7].includes(colNumber)) {
+      } else if ([7, 8].includes(colNumber)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
       }
