@@ -13,6 +13,7 @@ export interface InstallmentCoupon {
 interface ContractInfo {
   contract_ref: string;
   tenor_days: number;
+  daily_installment_amount?: number;
   customers: {
     name: string;
     address: string | null;
@@ -499,10 +500,10 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
                         {contract.contract_ref}
                     </div>
 
-                    <div className="right-section">
-                        <div className="lbl-besar">Besar Angsuran</div>
-                        <div className="val-besar">Rp {formatAmount(coupon.amount)}</div>
-                    </div>
+          <div className="right-section">
+            <div className="lbl-besar">Besar Angsuran</div>
+            <div className="val-besar">Rp {formatAmount(contract.daily_installment_amount ?? coupon.amount)}</div>
+          </div>
 
                     <div className="footer">KANTOR / {KANTOR_NUMBER}</div>
                   </div>

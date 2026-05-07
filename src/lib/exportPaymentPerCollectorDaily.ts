@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { autoResizeSheetColumns } from './excelUtils';
 import type { PaymentWithRelations } from '@/hooks/usePayments';
 
 interface PaymentSummary {
@@ -21,11 +22,12 @@ interface CollectorPaymentGroup {
   totalAmount: number;
 }
 
+// Detail sheet columns for Input Pembayaran (per-kolektor)
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'Jumlah Pembayaran', 'Jumlah Kupon', 'Angsuran/Kupon (Rp)', 'Total Tertagih (Rp)'
+  'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran ke', 'Kupon Bawa', 'Kupon Pulang', 'Kupon Dibayar', 'Angsuran/Kupon (Rp)', 'Tertagih (Rp)'
 ];
 
-const COL_WIDTHS = [5, 30, 16, 16, 12, 18, 18];
+const COL_WIDTHS = [5, 30, 16, 16, 12, 12, 12, 18, 18];
 
 export const exportPaymentPerCollectorDaily = async (
   payments: PaymentWithRelations[],
@@ -160,7 +162,7 @@ export const exportPaymentPerCollectorDaily = async (
     });
   });
 
-  summarySheet.columns = [5, 20, 12, 16, 12, 18].map((width) => ({ width }));
+  autoResizeSheetColumns(summarySheet, [5, 20, 12, 16, 12, 18]);
 
   // Create detail sheet per collector
   const usedNames = new Set<string>();
@@ -207,12 +209,16 @@ export const exportPaymentPerCollectorDaily = async (
 
     // Data rows
     collectorPayments.forEach((payment, idx) => {
+      const kuponPulang = Math.max(0, (payment.totalCoupons || 0) - (payment.paymentCount || 0));
+      const kuponDibayar = payment.paymentCount || 0;
       const rowValues = [
         idx + 1,
         payment.customerName,
         payment.contractRef,
         payment.paymentCount,
         payment.totalCoupons,
+        kuponPulang,
+        kuponDibayar,
         payment.dailyAmount,
         payment.totalAmount,
       ];
@@ -221,10 +227,10 @@ export const exportPaymentPerCollectorDaily = async (
       row.eachCell((cell, colNum) => {
         cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-        if ([4, 5].includes(colNum)) {
+        if ([4, 5, 6, 7].includes(colNum)) {
           cell.numFmt = '#,##0';
           cell.alignment = { horizontal: 'center' };
-        } else if ([6, 7].includes(colNum)) {
+        } else if ([8, 9].includes(colNum)) {
           cell.numFmt = '"Rp "#,##0';
           cell.alignment = { horizontal: 'right' };
         } else if (colNum === 1) {
@@ -236,11 +242,13 @@ export const exportPaymentPerCollectorDaily = async (
     // Subtotal row
     const subtotalRowNum = startRow + collectorPayments.length;
     const subtotalRowValues = [
-      '', '', 'TOTAL:', 
+      '', '', 'TOTAL:',
       { formula: `SUM(D${startRow}:D${subtotalRowNum - 1})` },
       { formula: `SUM(E${startRow}:E${subtotalRowNum - 1})` },
-      '',
+      { formula: `SUM(F${startRow}:F${subtotalRowNum - 1})` },
       { formula: `SUM(G${startRow}:G${subtotalRowNum - 1})` },
+      '',
+      { formula: `SUM(I${startRow}:I${subtotalRowNum - 1})` },
     ];
 
     const subtotalRow = sheet.addRow(subtotalRowValues);
@@ -249,10 +257,12 @@ export const exportPaymentPerCollectorDaily = async (
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-      if ([4, 5].includes(colNum)) {
+      // Columns 4-7 are counts (no currency)
+      if ([4, 5, 6, 7].includes(colNum)) {
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'right' };
-      } else if ([7].includes(colNum)) {
+      // Column 9 is the total amount in currency (Rp)
+      } else if ([9].includes(colNum)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
       } else if (colNum === 3) {
@@ -260,7 +270,7 @@ export const exportPaymentPerCollectorDaily = async (
       }
     });
 
-    sheet.columns = COL_WIDTHS.map((width) => ({ width }));
+  autoResizeSheetColumns(sheet, COL_WIDTHS);
   });
 
   // Download

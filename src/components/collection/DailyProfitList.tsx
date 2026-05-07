@@ -120,6 +120,7 @@ export function DailyProfitList() {
         collected: number;
         modal_portion: number;
         profit_portion: number;
+        angsuran_per_coupon: number;
       }
     >();
 
@@ -137,6 +138,7 @@ export function DailyProfitList() {
         collected: 0,
         modal_portion: 0,
         profit_portion: 0,
+        angsuran_per_coupon: info.daily_installment_amount || 0,
       };
       existing.coupons_paid += 1;
       existing.total_tagihan += info.daily_installment_amount;
@@ -162,6 +164,7 @@ export function DailyProfitList() {
           collected: 0,
           modal_portion: 0,
           profit_portion: 0,
+          angsuran_per_coupon: info.daily_installment_amount || 0,
         });
       } else {
         const r = grouped.get(contractId)!;
@@ -169,6 +172,7 @@ export function DailyProfitList() {
         r.kupon_pulang = Math.max(0, kb - r.coupons_paid);
         // Override total_tagihan to KB-based
         r.total_tagihan = kb * info.daily_installment_amount;
+        r.angsuran_per_coupon = info.daily_installment_amount || 0;
       }
     });
 
@@ -405,6 +409,7 @@ export function DailyProfitList() {
                         <TableHead className="text-center">KB</TableHead>
                         <TableHead className="text-center">KP</TableHead>
                         <TableHead className="text-center">Kupon dibayar</TableHead>
+                        <TableHead className="text-right">Angsuran/Kupon (Rp)</TableHead>
                         <TableHead className="text-right">Total Tagihan</TableHead>
                         <TableHead className="text-right">Tertagih</TableHead>
                         <TableHead className="text-right">Modal</TableHead>
@@ -439,6 +444,7 @@ export function DailyProfitList() {
                             <TableCell className="text-center">
                               <Badge variant="secondary">{r.coupons_paid}</Badge>
                             </TableCell>
+                            <TableCell className="text-right">{formatRupiah(r.angsuran_per_coupon)}</TableCell>
                             <TableCell className="text-right text-muted-foreground">{formatRupiah(r.total_tagihan)}</TableCell>
                             <TableCell className="text-right">{formatRupiah(r.collected)}</TableCell>
                             <TableCell className="text-right text-muted-foreground">

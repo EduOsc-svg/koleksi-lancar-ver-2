@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { autoResizeSheetColumns } from './excelUtils';
 
 interface EnrichedHandover {
   id: string;
@@ -31,11 +32,14 @@ interface CollectorDailySummary {
   total_sisa_nominal: number;
 }
 
+// Per-kolektor detail (Serah Terima Kupon) — original layout
 const HEADERS = [
   'No', 'Konsumen', 'Kode Kontrak', 'Pembayaran Ke', 'Kupon Bawa', 'Angsuran/Kupon (Rp)', 'Total (Rp)'
 ];
 
 const COL_WIDTHS = [5, 30, 16, 14, 12, 18, 18];
+
+// (autoResizeSheetColumns is provided by ./excelUtils and imported above)
 
 export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandover[], selectedDate: string) => {
   const workbook = new ExcelJS.Workbook();
@@ -121,7 +125,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     summaryRowNum += 1;
   });
 
-  summarySheet.columns = [5, 20, 12, 14, 18].map((width) => ({ width }));
+  autoResizeSheetColumns(summarySheet, [5, 20, 12, 14, 18]);
 
   // Create detail sheet per collector
   const usedNames = new Set<string>();
@@ -166,7 +170,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
 
     const startRow = hRow.number + 1;
 
-    // Data rows
+    // Data rows (Serah Terima Kupon original behavior)
     collectorHandovers.forEach((h, idx) => {
       const rowNum = startRow + idx;
       const dailyAmount = h.credit_contracts?.daily_installment_amount || 0;
@@ -222,7 +226,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
       }
     });
 
-    sheet.columns = COL_WIDTHS.map((width) => ({ width }));
+  autoResizeSheetColumns(sheet, COL_WIDTHS);
   });
 
   // Download

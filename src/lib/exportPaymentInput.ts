@@ -247,8 +247,14 @@ export const exportPaymentInputToExcel = async (
     });
   }
 
-  // Column widths
-  sheet.columns = COL_WIDTHS.map((width) => ({ width }));
+  // Column widths - auto-resize to content (use helper)
+  try {
+    // import at top would be static; use dynamic require to avoid top-level import cycles in some bundlers
+    const { autoResizeSheetColumns } = await import('./excelUtils');
+    autoResizeSheetColumns(sheet, COL_WIDTHS);
+  } catch (e) {
+    sheet.columns = COL_WIDTHS.map((width) => ({ width }));
+  }
 
   // Download
   const buffer = await workbook.xlsx.writeBuffer();

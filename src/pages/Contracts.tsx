@@ -431,7 +431,7 @@ export default function Contracts() {
           description: `Tuliskan alasan perubahan kontrak ${selectedContract.contract_ref}.`,
         });
         if (!note) return;
-        await updateContract.mutateAsync({
+        const { data: updated } = await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
           customer_id: formData.customer_id,
@@ -446,6 +446,20 @@ export default function Contracts() {
           omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
           _note: note,
         } as any);
+
+        // Update local state & cache so subsequent print uses latest values
+        try {
+          if (updated) {
+            setSelectedContract(updated as ContractWithCustomer);
+          }
+          // Invalidate relevant queries so hooks re-fetch fresh data
+          try { queryClient.invalidateQueries({ queryKey: ['credit_contracts'] }); } catch (e) { /* noop */ }
+          try { queryClient.invalidateQueries({ queryKey: ['installment_coupons', 'contract', selectedContract.id] }); } catch (e) { /* noop */ }
+        } catch (e) {
+          // non-fatal
+          console.debug('Failed to update cache after contract update', e);
+        }
+
         toast.success("Kontrak berhasil diperbarui");
       } else {
         // CREATE KONTRAK
@@ -728,8 +742,17 @@ export default function Contracts() {
       duration: 4000,
     });
 
+    // Defensive: ensure contract has daily_installment_amount; prefer contract value but fallback to coupon.amount
+    if (contract && (contract as any).daily_installment_amount == null && uniqueCoupons.length > 0) {
+      try {
+        (contract as any).daily_installment_amount = uniqueCoupons[0].amount;
+      } catch (e) {
+        // ignore
+      }
+    }
+
     // Use temporary state so PrintCoupon8x5 can render the coupons immediately
-  setTempPrintedCoupons(uniqueCoupons as InstallmentCoupon[]);
+    setTempPrintedCoupons(uniqueCoupons as InstallmentCoupon[]);
     setTempPrintedContract(contract);
     setPrintMode(true);
 
@@ -811,6 +834,7 @@ export default function Contracts() {
           contract={{
             contract_ref: tempPrintedContract.contract_ref,
             tenor_days: tempPrintedContract.tenor_days,
+            daily_installment_amount: tempPrintedContract.daily_installment_amount ?? undefined,
             customers: tempPrintedContract.customers ? {
               name: tempPrintedContract.customers.name,
               address: tempPrintedContract.customers.address || null,

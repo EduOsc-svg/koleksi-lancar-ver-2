@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileX, Download, Clock, UserCheck, ArrowRight, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
+import { FileX, Clock, UserCheck, ArrowRight, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { usePagination } from "@/hooks/usePagination";
-import { exportHandoversToExcel } from "@/lib/exportOutstandingCoupons";
-import { toast } from "sonner";
+// export per-kolektor button is kept at page level (Collection.tsx). Remove local Excel export to avoid duplicates.
 import { SearchInput } from "@/components/ui/search-input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -97,15 +96,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
   const partialCount = allHandovers.filter(h => h.status === 'partially_paid').length;
   const unpaidCount = allHandovers.filter(h => h.status === 'unpaid').length;
 
-  const handleExport = async () => {
-    if (filteredHandovers.length === 0) return;
-    try {
-      await exportHandoversToExcel(filteredHandovers);
-      toast.success("File Excel berhasil diunduh");
-    } catch {
-      toast.error("Gagal mengekspor Excel");
-    }
-  };
+  // Export is handled by the page-level "Export Per Kolektor" button to avoid duplicate exports
 
   /* ─── Loading State ─── */
   if (isLoading) {
@@ -258,10 +249,6 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{totalItems} serah terima</p>
-        <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-9 text-sm">
-          <Download className="h-4 w-4" />
-          Export Excel
-        </Button>
       </div>
 
       {/* ─── Unified Table ─── */}

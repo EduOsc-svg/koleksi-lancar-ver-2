@@ -202,16 +202,18 @@ export function MonthlyProfitView() {
     const data: any[] = [
       ["Keuntungan Harian - " + format(currentDate, "MMMM yyyy", { locale: id })],
       [],
-      ["Tanggal", "Kupon", "Tertagih", "Modal", "Keuntungan", "Margin %"],
+      ["Tanggal", "Kupon", "Angsuran/Kupon (Rp)", "Tertagih", "Modal", "Keuntungan", "Margin %"],
     ];
 
     days.forEach(day => {
       const dateStr = format(day, "yyyy-MM-dd");
       const daily = dailyProfits.get(dateStr);
       if (daily && (daily.coupons > 0 || daily.profit > 0)) {
+        const angsuranPerCoupon = daily.coupons > 0 ? Math.round(daily.collected / daily.coupons) : 0;
         data.push([
           format(day, "dd MMM yyyy", { locale: id }),
           daily.coupons,
+          angsuranPerCoupon,
           daily.collected,
           daily.modal,
           daily.profit,
@@ -221,9 +223,11 @@ export function MonthlyProfitView() {
     });
 
     data.push([]);
+    const avgAngsuran = monthlySummary.totalCoupons > 0 ? Math.round(monthlySummary.totalCollected / monthlySummary.totalCoupons) : 0;
     data.push([
       "TOTAL",
       monthlySummary.totalCoupons,
+      avgAngsuran,
       monthlySummary.totalCollected,
       monthlySummary.totalModal,
       monthlySummary.totalProfit,
@@ -290,58 +294,66 @@ export function MonthlyProfitView() {
         </CardContent>
       </Card>
 
-      {/* Monthly Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* Monthly Summary Stats - refined layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Receipt className="h-4 w-4" />
-              Total Kupon
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Receipt className="h-4 w-4" />
+                Total Kupon
+              </div>
+              <div className="text-lg font-bold">{monthlySummary.totalCoupons}</div>
             </div>
-            <div className="text-2xl font-bold">{monthlySummary.totalCoupons}</div>
+            <div className="text-xs text-muted-foreground">&nbsp;</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Calendar className="h-4 w-4" />
-              Hari Aktif
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Calendar className="h-4 w-4" />
+                Hari Aktif
+              </div>
+              <div className="text-lg font-bold">{monthlySummary.totalDays}</div>
+              <div className="text-xs text-muted-foreground mt-1">dari {days.length}</div>
             </div>
-            <div className="text-2xl font-bold">{monthlySummary.totalDays}</div>
-            <div className="text-xs text-muted-foreground mt-1">dari {days.length}</div>
+            <div className="text-xs text-muted-foreground">&nbsp;</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Wallet className="h-4 w-4" />
-              Total Tertagih
-            </div>
-            <div className="text-2xl font-bold">{formatRupiah(monthlySummary.totalCollected)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <TrendingUp className="h-4 w-4" />
-              Total Profit
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {formatRupiah(monthlySummary.totalProfit)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Margin {monthlySummary.margin.toFixed(1)}%
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Wallet className="h-4 w-4" />
+                Total Tertagih
+              </div>
+              <div className="text-lg font-bold text-right">{formatRupiah(monthlySummary.totalCollected)}</div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Coins className="h-4 w-4" />
-              Rata-rata Harian
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <TrendingUp className="h-4 w-4" />
+                Total Profit
+              </div>
+              <div className="text-lg font-bold text-green-600 text-right">
+                {formatRupiah(monthlySummary.totalProfit)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Margin {monthlySummary.margin.toFixed(1)}%</div>
             </div>
-            <div className="text-2xl font-bold">
-              {formatRupiah(monthlySummary.avgDaily)}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Coins className="h-4 w-4" />
+                Rata-rata Harian
+              </div>
+              <div className="text-lg font-bold text-right">{formatRupiah(monthlySummary.avgDaily)}</div>
             </div>
           </CardContent>
         </Card>
